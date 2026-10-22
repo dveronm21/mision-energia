@@ -54,7 +54,8 @@ export interface InputState {
 export type ClientMsg =
   | { t: 'hello'; v: number; name: string; token?: string; device: 'browser' | 'app' }
   | { t: 'input'; s: InputState }
-  | { t: 'ping'; at: number }
+  /** `rtt` (opcional): última latencia ida y vuelta medida por la tablet, en ms, para mostrarla en el tele. */
+  | { t: 'ping'; at: number; rtt?: number }
   | { t: 'bye' };
 
 /* ---------- Mensajes tele → tablet ---------- */
@@ -70,7 +71,8 @@ export interface ControllerContext {
 }
 
 export type ServerMsg =
-  | { t: 'welcome'; v: number; slot: PlayerSlot; token: string; color: string; colorName: string; tvName: string }
+  /** `resumed` (opcional): true si la tablet recuperó su asiento reservado con el mismo token. */
+  | { t: 'welcome'; v: number; slot: PlayerSlot; token: string; color: string; colorName: string; tvName: string; resumed?: boolean }
   | { t: 'full'; reason: string }
   | { t: 'ctx'; c: ControllerContext }
   | { t: 'haptic'; pattern: number[] }          // ms para navigator.vibrate

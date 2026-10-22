@@ -1,0 +1,12 @@
+{
+  "name": "mision-energia-remote-test",
+  "private": true,
+  "description": "Pruebas de escritorio del núcleo de red Java (RemoteServer) con un cliente Node y Playwright",
+  "type": "module",
+  "scripts": {
+    "test": "./run-tests.sh"
+  },
+  "dependencies": {
+    "ws": "8.18.0"
+  }
+}

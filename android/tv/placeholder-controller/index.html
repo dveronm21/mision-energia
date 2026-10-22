@@ -1,0 +1,51 @@
+<!doctype html>
+<!-- PLACEHOLDER: build-variant.sh tv lo usa solo si app/dist/controller/ todavía no existe.
+     La página de control real la genera la parte web (app/dist/controller/). -->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0E2420">
+<title>Misión Energía · Control (provisorio)</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0E2420; color: #fff; font-family: system-ui, sans-serif; }
+  main { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 16px; padding: 16px; box-sizing: border-box; text-align: center; }
+  h1 { margin: 0; font-size: 22px; }
+  #st { opacity: .8; }
+  button { background: #FFB82E; color: #0E2420; border: 0; border-radius: 16px; font-size: 22px; font-weight: 700; padding: 18px 36px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Control provisorio</h1>
+  <div id="st">Conectando…</div>
+  <button id="act">Acción</button>
+</main>
+<script>
+(function () {
+  var st = document.getElementById('st');
+  var seq = 0, taps = { action: 0, inspect: 0, tool: 0, pause: 0 }, ws = null, rtt = '–';
+  function input() { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'input', s: { seq: ++seq, x: 0, y: 0, held: 0, taps: taps } })); }
+  function connect() {
+    ws = new WebSocket('ws://' + location.host + '/ws');
+    ws.onopen = function () {
+      var token = null; try { token = localStorage.getItem('me-token'); } catch (e) {}
+      ws.send(JSON.stringify({ t: 'hello', v: 1, name: 'Tablet', token: token || undefined, device: /[?&]app=1/.test(location.search) ? 'app' : 'browser' }));
+    };
+    ws.onmessage = function (ev) {
+      var m = JSON.parse(ev.data);
+      if (m.t === 'welcome') { try { localStorage.setItem('me-token', m.token); } catch (e) {} st.textContent = 'Jugador ' + m.colorName + ' · ' + m.tvName; }
+      else if (m.t === 'full') st.textContent = 'Lleno: ' + m.reason;
+      else if (m.t === 'pong') rtt = Math.round(performance.now() - m.at) + ' ms';
+      else if (m.t === 'haptic' && navigator.vibrate) navigator.vibrate(m.pattern);
+    };
+    ws.onclose = function () { st.textContent = 'Reconectando…'; setTimeout(connect, 1000); };
+  }
+  document.getElementById('act').onclick = function () { taps.action++; input(); };
+  setInterval(input, 100);
+  setInterval(function () { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'ping', at: performance.now() })); document.title = 'RTT ' + rtt; }, 1000);
+  connect();
+})();
+</script>
+</body>
+</html>
