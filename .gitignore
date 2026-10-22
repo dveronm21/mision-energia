@@ -10,3 +10,4 @@ app/e2e/out/
 godot/tools/remote_test/node_modules/
 godot/tools/remote_test/out/
 godot/tools/export_models/node_modules/
+godot/tools/out/

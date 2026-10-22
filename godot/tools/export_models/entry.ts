@@ -182,23 +182,14 @@ function buildWorker(f: ModelFactory): THREE.Object3D {
 function buildBuilding(f: ModelFactory, w: number, h: number, d: number, variant: number): THREE.Object3D {
   const b = f.createBuilding(w, h, d, variant);
   const mesh = b.root.children[0] as THREE.Mesh;
-  const src = mesh.material as THREE.MeshStandardMaterial;
-  // Las 4 paredes son los primeros 4 planos (6 vértices c/u): ahí están las ventanas.
-  const g = mesh.geometry;
-  const facade = new THREE.BufferGeometry(), rest = new THREE.BufferGeometry();
-  const N = 24;
-  for (const name of ['position', 'normal', 'uv', 'color']) {
-    const a = g.attributes[name] as THREE.BufferAttribute;
-    const arr = a.array as Float32Array;
-    facade.setAttribute(name, new THREE.BufferAttribute(arr.slice(0, N * a.itemSize), a.itemSize));
-    rest.setAttribute(name, new THREE.BufferAttribute(arr.slice(N * a.itemSize), a.itemSize));
-  }
-  const winMat = src.clone(); winMat.name = 'windows';
-  winMat.emissive.set(0xffd9a0); winMat.emissiveIntensity = 1; // el mapa emisivo sólo tiene las ventanas
-  const bodyMat = f.mats.surface({ vertexColors: true, map: src.map, roughness: 0.9 }); bodyMat.name = 'building_body';
-  const fm = new THREE.Mesh(facade, winMat); fm.name = 'facade';
-  const bm = new THREE.Mesh(rest, bodyMat); bm.name = 'body';
-  return group('building', bm, fm);
+  // Una sola malla y un solo material (1 draw call por edificio): el mapa emisivo sólo tiene las ventanas
+  // (las zonas lisas del atlas, que usan zócalo, cornisas y techo, son negras en el emisivo).
+  const mat = (mesh.material as THREE.MeshStandardMaterial).clone();
+  mat.name = 'windows';
+  mat.emissive.set(0xffd9a0); mat.emissiveIntensity = 1; // Godot lo apaga al importar y lo maneja BuildingVisual
+  mesh.material = mat;
+  mesh.name = 'body';
+  return group('building', mesh);
 }
 
 /* ======================================================================= ambiente */
@@ -317,8 +308,8 @@ export async function exportAll(fontBase: string): Promise<Out> {
     p.children[1].name = 'lamp';
     return p;
   });
-  add('slab', () => group('slab', f.createSlab(11, 6)));
-  add('wall', () => group('wall', f.createWall(11, 3.1)));
+  add('slab', () => { const m = f.createSlab(11, 6); m.name = 'body'; return group('slab', m); });
+  add('wall', () => { const m = f.createWall(11, 3.1); m.name = 'body'; return group('wall', m); });
   add('canopy', () => { const c = f.createCanopy(11.4, 2.2, 3.4); nameFirstMesh(c, 'body'); return c; });
   add('worker', () => buildWorker(f));
 

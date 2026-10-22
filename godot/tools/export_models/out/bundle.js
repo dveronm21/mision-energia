@@ -27314,27 +27314,13 @@ void main(){
   function buildBuilding(f, w, h, d, variant) {
     const b = f.createBuilding(w, h, d, variant);
     const mesh2 = b.root.children[0];
-    const src = mesh2.material;
-    const g = mesh2.geometry;
-    const facade = new BufferGeometry(), rest = new BufferGeometry();
-    const N = 24;
-    for (const name of ["position", "normal", "uv", "color"]) {
-      const a = g.attributes[name];
-      const arr = a.array;
-      facade.setAttribute(name, new BufferAttribute(arr.slice(0, N * a.itemSize), a.itemSize));
-      rest.setAttribute(name, new BufferAttribute(arr.slice(N * a.itemSize), a.itemSize));
-    }
-    const winMat = src.clone();
-    winMat.name = "windows";
-    winMat.emissive.set(16767392);
-    winMat.emissiveIntensity = 1;
-    const bodyMat = f.mats.surface({ vertexColors: true, map: src.map, roughness: 0.9 });
-    bodyMat.name = "building_body";
-    const fm = new Mesh(facade, winMat);
-    fm.name = "facade";
-    const bm = new Mesh(rest, bodyMat);
-    bm.name = "body";
-    return group("building", bm, fm);
+    const mat = mesh2.material.clone();
+    mat.name = "windows";
+    mat.emissive.set(16767392);
+    mat.emissiveIntensity = 1;
+    mesh2.material = mat;
+    mesh2.name = "body";
+    return group("building", mesh2);
   }
   function buildEnvironment(f, out, pending) {
     const env = new Environment(f, { quality: "high" });
@@ -27515,8 +27501,16 @@ void main(){
       p.children[1].name = "lamp";
       return p;
     });
-    add("slab", () => group("slab", f.createSlab(11, 6)));
-    add("wall", () => group("wall", f.createWall(11, 3.1)));
+    add("slab", () => {
+      const m = f.createSlab(11, 6);
+      m.name = "body";
+      return group("slab", m);
+    });
+    add("wall", () => {
+      const m = f.createWall(11, 3.1);
+      m.name = "body";
+      return group("wall", m);
+    });
     add("canopy", () => {
       const c = f.createCanopy(11.4, 2.2, 3.4);
       nameFirstMesh(c, "body");
