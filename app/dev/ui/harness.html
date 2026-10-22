@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Misión Energía — banco de UI</title>
+<style>
+  /* Mundo 3D falso, sólo para juzgar contraste del HUD. */
+  #app{position:fixed;inset:0}
+  .fake-world{background:
+    radial-gradient(circle at 78% 18%,#FFF6C8 0 4%,rgba(255,230,140,.6) 6%,transparent 14%),
+    linear-gradient(180deg,#8CCBE6 0%,#BFE3F0 46%,#D9C8A0 47%,#C9B07A 70%,#A88A55 100%)}
+  .fake-world::after{content:'';position:absolute;left:18%;right:22%;top:52%;height:16%;background:repeating-linear-gradient(90deg,#1F3A66 0 46px,#2E5590 46px 50px);transform:perspective(400px) rotateX(48deg);opacity:.9}
+  .fake-world.is-night{background:radial-gradient(circle at 20% 15%,#F4F1E0 0 1.5%,transparent 2.5%),linear-gradient(180deg,#0B1530 0%,#1A2850 46%,#2A2A28 47%,#1C1B18 100%)}
+</style>
+</head>
+<body>
+<div id="app" class="fake-world"></div>
+<div id="ui"></div>
+<script src="out/harness.js"></script>
+</body>
+</html>

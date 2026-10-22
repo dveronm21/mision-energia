@@ -1,0 +1,62 @@
+name: Compilar y publicar APK
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Herramientas Android (paquetes de Ubuntu)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q aapt apksigner zipalign dalvik-exchange android-sdk-platform-23
+
+      - name: Juego (tipos, tests, balance, build)
+        working-directory: app
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+          npm run balance
+          npm run build
+
+      - name: Firmar y empaquetar APK
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.KS_PASS }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          KS="$RUNNER_TEMP/release.jks" ./android/build.sh
+          rm -f "$RUNNER_TEMP/release.jks"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MisionEnergia-apk
+          path: android/build/MisionEnergia.apk
+
+      - name: Publicar en Releases
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" android/build/MisionEnergia.apk --clobber
+          else
+            gh release create "$TAG" android/build/MisionEnergia.apk \
+              --title "Misión Energía ${TAG#v}" --notes-file docs/RELEASE_NOTES.md --latest
+          fi

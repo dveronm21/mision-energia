@@ -1,0 +1,9 @@
+node_modules/
+app/dist/
+android/build/
+*.jks
+CLAVES*
+app/dev/out/
+app/dev/ui/out/
+assets/
+app/e2e/out/
