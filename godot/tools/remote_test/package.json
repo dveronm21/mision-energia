@@ -1,0 +1,12 @@
+{
+  "name": "mision-energia-godot-remote-test",
+  "private": true,
+  "description": "Pruebas de integración del servidor remoto GDScript (RemoteServer + RemoteHost en Godot headless) con Node ws, UDP y Playwright",
+  "type": "module",
+  "scripts": {
+    "test": "./run.sh"
+  },
+  "dependencies": {
+    "ws": "8.18.0"
+  }
+}
