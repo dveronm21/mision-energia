@@ -7,6 +7,10 @@ extends Node
 ##
 ## Es el script de `scenes/Main.tscn`. El mundo 3D de la partida va en `world_host`; la UI,
 ## en una `CanvasLayer` encima.
+##
+## Modo TV (`TvMode.wanted()`): Splash → Sala (QR) → Menú…; cada tablet maneja un técnico,
+## los menús se recorren con el D-pad del control remoto o con el stick de la tablet, y el
+## tele no muestra joystick ni botonera.
 
 const QUALITY_KEY: String = "settings.quality"
 const BOOSTER_IDS: Array[String] = [Boosters.HINT, Boosters.DRONE, Boosters.BATTERY, Boosters.BUDGET]
@@ -30,6 +34,8 @@ var _welcome_checked: bool = false
 ## Ajustes se arma de nuevo.
 var _menu_stale: bool = false
 var _pause_menu: PauseMenu = null
+## null fuera del modo TV.
+var tv: TvMode = null
 
 
 func _ready() -> void:
@@ -59,10 +65,18 @@ func _ready() -> void:
 	ui.hud_layer.add_child(hud.root)
 	(hud.alert as AlertBanner).on_resize = _on_alert_resize
 
+	if TvMode.wanted():
+		tv = TvMode.new()
+		add_child(tv)
+		tv.start()
+		hud.set_tv_mode(true)
+		_keyboard.enter_is_action = true
+		tv.host.joined.connect(_on_tv_join)
+		tv.host.resumed.connect(_on_tv_join)
+
 	_keyboard.on_action = cb.on_action
 	_keyboard.on_inspect = cb.on_inspect
 	_keyboard.on_meter = cb.on_meter
-	_keyboard.on_back = func() -> void: handle_back()
 
 	_services.bus.sfx.connect(_on_sfx)
 
@@ -74,16 +88,50 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	var dt: float = minf(0.1, maxf(0.0, delta))
+	if tv != null:
+		tv.poll()
 	var ss: GameSession = session
+	var menu_open: bool = ui.screens.top() != null
+	if tv != null and (ss == null or menu_open):
+		tv.navigate_menus(dt)
+		_push_menu_context()
 	if ss == null:
 		return
-	var input: Vector2 = (hud.joystick.vector() + _keyboard.vector()).clamp(-Vector2.ONE, Vector2.ONE)
-	ss.update(minf(0.1, maxf(0.0, delta)), input)
+	var local: Vector2 = (hud.joystick.vector() + _keyboard.vector()).clamp(-Vector2.ONE, Vector2.ONE)
+	if tv == null:
+		ss.update(dt, local)
+		return
+	# Modo TV: cada técnico se mueve con su tablet (el que no tiene tablet, con el control remoto).
+	var moves: Array[Vector2] = []
+	for t: Technician in ss.technicians():
+		if t.slot < 0:
+			moves.append(local)
+		else:
+			var it: PlayerIntent = tv.intent(t.slot)
+			moves.append(Vector2(it.x, it.y))
+	ss.update_multi(dt, moves)
+	if menu_open or session != ss:
+		return
+	for t: Technician in ss.technicians():
+		if t.slot < 0:
+			continue
+		var it: PlayerIntent = tv.intent(t.slot)
+		if it.pause:
+			pause()
+			return
+		if it.action or it.inspect or it.tool:
+			ss.apply_intent(t, it)
+		tv.host.set_context(t.slot, ss.controller_context(t))
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _keyboard.handle(event):
 		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed(&"ui_cancel"):
+		# Escape, el "atrás" del control remoto o "pausa" de la tablet en un menú.
+		get_viewport().set_input_as_handled()
+		handle_back()
 
 
 func _notification(what: int) -> void:
@@ -112,7 +160,13 @@ func _version() -> String:
 
 
 func show_splash() -> void:
-	ui.screens.reset(SplashScreen.new(show_menu, _audio(), _version()))
+	ui.screens.reset(SplashScreen.new(show_lobby if tv != null else show_menu, _audio(), _version()))
+
+
+## Modo TV: sala de espera con el QR. "Empezar" va al menú; "Atrás" cierra la app.
+func show_lobby() -> void:
+	_end_session()
+	ui.screens.reset(LobbyScreen.new(tv.host, show_menu, func() -> void: get_tree().quit()))
 
 
 func show_menu() -> void:
@@ -279,6 +333,10 @@ func start_level(run: LevelRun) -> void:
 	session = GameSession.new(d)
 	world_host.add_child(session.root)
 	session.set_quality(QUALITY_INDEX[_quality])
+	if tv != null:
+		session.on_feedback = _on_session_feedback
+		for p: RemotePlayer in tv.players():
+			session.add_technician(p.slot, p.name, Color.from_string(p.color, UiTheme.SUN))
 	session.start_intro()
 	_audio().play("whoosh")
 	ui.screens.reset()
@@ -362,6 +420,40 @@ func _place_toast() -> void:
 	t.root.offset_top = 12.0 + ((a.root.size.y + 8.0) if a.visible_now else 0.0)
 
 
+# ================================================================== modo TV
+
+
+## Una tablet entró (o volvió) en plena partida: su técnico aparece al lado del otro.
+func _on_tv_join(p: RemotePlayer) -> void:
+	if session != null:
+		session.add_technician(p.slot, p.name, Color.from_string(p.color, UiTheme.SUN))
+
+
+## Aviso de la partida para las tablets: vibración siempre, y el texto solo a quien lo provocó.
+func _on_session_feedback(slot: int, kind: StringName, text: String) -> void:
+	var targets: Array[int] = [slot] if slot >= 0 else RemoteHost.SLOTS
+	for s: int in targets:
+		if kind == &"bad":
+			tv.host.haptic(s, [90, 60, 90])
+		elif kind == &"good":
+			tv.host.haptic(s, [35])
+		if slot >= 0 and kind != &"info":
+			tv.host.toast(s, text, String(kind))
+
+
+## Qué muestran las tablets fuera de la partida, según la pantalla de arriba del tele.
+func _push_menu_context() -> void:
+	var top: UiScreen = ui.screens.top()
+	if top is LobbyScreen:
+		tv.menu_context("lobby", "¡Listo! Cuando estén todos, tocá Empezar en el tele")
+	elif top is PauseMenu:
+		tv.menu_context("paused", "Pausa: elegí en el tele con el stick y el botón")
+	elif top is ResultScreen:
+		tv.menu_context("result", "¡Mirá el resultado en el tele!")
+	else:
+		tv.menu_context("menu", "Elegí en el tele: mové el stick y tocá el botón")
+
+
 func _on_sfx(sfx_name: String) -> void:
 	_audio().play(sfx_name)
 
@@ -398,6 +490,9 @@ func _on_inspect_close() -> void:
 
 ## Botón atrás de Android (o Escape). false = no había nada que cerrar (la app puede salir).
 func handle_back() -> bool:
+	if tv != null and ui.screens.top() is MainMenu:
+		show_lobby()
+		return true
 	if ui.handle_back():
 		return true
 	if session != null and session.phase() != SessionPort.PHASE_FINISHED:

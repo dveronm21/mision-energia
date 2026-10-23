@@ -124,3 +124,14 @@ func _init(cb: HudCallbacks = HudCallbacks.new()) -> void:
 		panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 
 	root.add_child(bottom_lane)
+
+
+## Modo TV: se juega desde las tablets, así que el tele no muestra joystick, botonera ni
+## boosters (quedan la misión, las estadísticas, las alertas y las fichas).
+func set_tv_mode(on: bool) -> void:
+	joystick.visible = not on
+	_actions_real.root.visible = not on
+	_actions_real.pause_button.visible = not on
+	_boosters_real.suppressed = on
+	if on:
+		_boosters_real.root.visible = false

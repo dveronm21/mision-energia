@@ -74,8 +74,18 @@ var _flow_violet: EnergyFlowVisual
 var _flow_grid: EnergyFlowVisual
 var _flow_pump: EnergyFlowVisual
 var _disposed: bool = false
-## Visual del técnico (gestos de festejo y de "uy").
+## Visual del técnico activo (gestos de festejo y de "uy").
 var _rig: WorkerVisual
+## Técnicos en la planta (1 en solo, hasta 2 en el modo TV) y el que se está procesando ahora:
+## `player`, `_hands`, `_rig` y el estado de interacción apuntan siempre al activo, así las
+## reglas de interacción (que preguntan por `hands()`) sirven sin cambios para cualquiera.
+var _techs: Array[Technician] = []
+var _actor: Technician = null
+var _cam_base_dist: float = 11.5
+## Callable(slot: int, kind: StringName, text: String) -> void: avisos para la tablet del técnico
+## que provocó un toast (en cooperativo, para vibrar o mostrarlo en su control).
+var on_feedback: Callable = Callable()
+var _in_intent: bool = false
 
 
 func _init(deps: SessionDeps) -> void:
@@ -99,18 +109,14 @@ func _init(deps: SessionDeps) -> void:
 
 	var helmet: Color = _d.cosmetics.get("helmet", VisualMaterials.C_SUN)
 	var vest: Color = _d.cosmetics.get("vest", VisualMaterials.C_ORANGE)
-	var rig: WorkerVisual = WorkerVisual.new(helmet, vest)
-	_rig = rig
-	player = Player.new(rig, _world.colliders, _world.floor_at, _world.layout.spawn)
-	_world.add_child(player)
-	_hands = HandsController.new(rig)
-
 	cam_rig = CameraRig.new()
 	root.add_child(cam_rig)
 	cam_rig.snap()
+	_cam_base_dist = cam_rig.dist
 
 	_highlights = Highlights.new()
 	root.add_child(_highlights)
+	_bind(_make_tech(helmet, vest, _world.layout.spawn, _highlights))
 
 	_interaction = InteractionSystem.new(
 		[
@@ -181,6 +187,9 @@ func toast(text: String, kind: StringName = &"info") -> void:
 	if kind == &"bad":
 		sfx("bad")
 		_rig.play_gesture(&"oops")
+	# Cooperativo: lo que provocó un técnico va a su tablet; lo demás (clima, noche), a las dos.
+	if on_feedback.is_valid():
+		on_feedback.call(_actor.slot if _in_intent else -1, kind, text)
 
 
 func sfx(sfx_name: String) -> void:
@@ -491,18 +500,30 @@ func snapshot() -> SimSnapshot:
 	return _snap
 
 
-## Un cuadro de juego. `input`: joystick/teclado (x, y en −1..1).
+## Un cuadro de juego con un solo técnico. `input`: joystick/teclado (x, y en −1..1).
 func update(dt_real: float, input: Vector2) -> void:
+	_frame(dt_real, [input] as Array[Vector2])
+
+
+## Un cuadro con varios técnicos (modo TV): `moves[i]` mueve al técnico `i` (faltante = quieto).
+func update_multi(dt_real: float, moves: Array[Vector2]) -> void:
+	_frame(dt_real, moves)
+
+
+func _frame(dt_real: float, moves: Array[Vector2]) -> void:
 	if _disposed:
 		return
 	var dt: float = clampf(dt_real, 0.0, 0.05)
 	if not paused:
 		if _phase != PHASE_FINISHED:
 			_elapsed += clampf(dt_real, 0.0, 0.25)
-		player.speed_factor = (0.85 if _hands.kind() == HandsState.KIND_CARRY else 1.0) * (0.8 if _weather == WeatherSchedule.ZONDA_STORM else 1.0)
-		player.pose = _hands.pose()
 		var can_move: bool = _phase != PHASE_FINISHED
-		player.update(dt, input.x if can_move else 0.0, input.y if can_move else 0.0, cam_rig.yaw)
+		for i: int in _techs.size():
+			var t: Technician = _techs[i]
+			var mv: Vector2 = moves[i] if i < moves.size() and can_move else Vector2.ZERO
+			t.player.speed_factor = (0.85 if t.hands.kind() == HandsState.KIND_CARRY else 1.0) * (0.8 if _weather == WeatherSchedule.ZONDA_STORM else 1.0)
+			t.player.pose = t.hands.pose()
+			t.player.update(dt, mv.x, mv.y, cam_rig.yaw)
 		if _phase == PHASE_RUNNING:
 			_step_sim(dt)
 		if _phase == PHASE_FINISHED and _finish_timer >= 0.0:
@@ -511,20 +532,158 @@ func update(dt_real: float, input: Vector2) -> void:
 				_finish_timer = -1.0
 				_d.on_finished.call(_result())
 	_world.update(dt, dt * maxf(1.0, time_scale))
-	_highlights.update(dt)
+	for t: Technician in _techs:
+		t.highlights.update(dt)
 	_update_visuals(dt)
 	cam_rig.shake = 1.0 if _weather == WeatherSchedule.ZONDA_STORM else (0.15 if _weather == WeatherSchedule.ZONDA_WARNING else 0.0)
-	cam_rig.update(dt, player.position)
-	var live: HandsState = _hands.hands()
-	var live_from: Variant = live.cable_from_point if live.kind == HandsState.KIND_CABLE else null
-	var live_color: Variant = live.cable_color if live.kind == HandsState.KIND_CABLE else null
-	_world.cables.update_live(live_from, _hands.hand_world(), live_color)
+	cam_rig.update(dt, _camera_focus())
+	# Cable "en la mano": se dibuja el del primer técnico que lleve uno.
+	var live_tech: Technician = null
+	for t: Technician in _techs:
+		if t.hands.kind() == HandsState.KIND_CABLE:
+			live_tech = t
+			break
+	if live_tech != null:
+		var live: HandsState = live_tech.hands.hands()
+		_world.cables.update_live(live.cable_from_point, live_tech.hands.hand_world(), live.cable_color)
+	else:
+		_world.cables.update_live(null, _techs[0].hands.hand_world(), null)
 	if not paused and _phase != PHASE_FINISHED:
-		_update_interaction()
+		for t: Technician in _techs:
+			_bind(t)
+			_update_interaction()
+			_save_actor()
+	_bind(_techs[0])
 	_hud_timer -= dt
 	if _hud_timer <= 0.0:
 		_hud_timer = 0.16
 		_sync_hud()
+
+
+## Punto que sigue la cámara: el técnico, o el medio entre los dos (y se aleja si se separan,
+## para que entren ambos en pantalla).
+func _camera_focus() -> Vector3:
+	if _techs.size() == 1:
+		return _techs[0].player.position
+	var a: Vector3 = _techs[0].player.position
+	var b: Vector3 = _techs[1].player.position
+	if not cam_rig.is_moving():
+		var want: float = clampf(_cam_base_dist + a.distance_to(b) * 0.55, _cam_base_dist, CameraRig.MAX_DIST + 6.0)
+		cam_rig.dist = lerpf(cam_rig.dist, want, 0.06)
+	return (a + b) / 2.0
+
+
+# ================================================================== técnicos
+
+
+func _make_tech(helmet: Color, vest: Color, pos: Vector3, hl: Highlights) -> Technician:
+	var rig: WorkerVisual = WorkerVisual.new(helmet, vest)
+	var p: Player = Player.new(rig, _world.colliders, _world.floor_at, pos)
+	_world.add_child(p)
+	var t: Technician = Technician.new(p, rig, hl)
+	_techs.append(t)
+	return t
+
+
+## Activa un técnico: desde acá, `player`, `_hands`, `_rig` y la acción a mano son los suyos.
+func _bind(t: Technician) -> void:
+	_actor = t
+	player = t.player
+	_hands = t.hands
+	_rig = t.rig
+	_current_action = t.action
+	_current_inspect = t.inspect
+	_last_prompt = t.last_prompt
+
+
+func _save_actor() -> void:
+	if _actor == null:
+		return
+	_actor.action = _current_action
+	_actor.inspect = _current_inspect
+	_actor.last_prompt = _last_prompt
+
+
+func technicians() -> Array[Technician]:
+	return _techs
+
+
+## Técnico de una tablet (asiento 0/1), o null.
+func technician_for_slot(slot: int) -> Technician:
+	for t: Technician in _techs:
+		if t.slot == slot:
+			return t
+	return null
+
+
+## Modo TV: el primer técnico pasa a ser de la tablet `slot` (con su nombre y color en el
+## chaleco); si ya hay uno, se suma un segundo al lado. Devuelve el técnico.
+func add_technician(slot: int, p_name: String, color: Color) -> Technician:
+	var t: Technician = technician_for_slot(slot)
+	if t == null:
+		if _techs.size() == 1 and _techs[0].slot == -1:
+			t = _techs[0]
+		else:
+			var hl: Highlights = Highlights.new()
+			root.add_child(hl)
+			var spawn: Vector3 = _world.layout.spawn + Vector3(1.4, 0, 0.6)
+			t = _make_tech(VisualMaterials.C_SUN, color, spawn, hl)
+	t.slot = slot
+	t.rig.set_cosmetics(VisualMaterials.C_SUN, color)
+	t.add_name_tag(p_name, color)
+	return t
+
+
+## Una pulsación de la tablet del técnico `t`: acción, revisar o multímetro.
+func apply_intent(t: Technician, intent: PlayerIntent) -> void:
+	if not _techs.has(t):
+		return
+	_bind(t)
+	_in_intent = true
+	if intent.action:
+		do_action()
+	if intent.inspect:
+		toggle_inspect()
+	if intent.tool:
+		toggle_meter()
+	_in_intent = false
+	_save_actor()
+	_bind(_techs[0])
+
+
+## Lo que muestra la tablet de `t`: su botón de acción, si puede revisar o usar el multímetro,
+## el paso de la misión y una línea de estado (batería y hora).
+func controller_context(t: Technician) -> Dictionary:
+	var label: String = "Acercate a algo"
+	var style: String = "idle"
+	var enabled: bool = true
+	var h: HandsState = t.hands.hands()
+	if _phase == PHASE_FINISHED:
+		label = "¡Terminó!"
+		enabled = false
+	elif t.action != null:
+		label = t.action.label
+		style = "normal"
+	elif h.kind == HandsState.KIND_METER:
+		label = "Medir"
+	elif h.kind == HandsState.KIND_CABLE:
+		label = "Soltar cable"
+		style = "drop"
+	elif h.kind == HandsState.KIND_CARRY:
+		label = "Soltar"
+		style = "drop"
+	elif _phase == PHASE_RUNNING:
+		label = "Planta en marcha"
+	var objective: String = ""
+	for o: MissionObjective in _tracker.objectives():
+		if o.state == MissionObjective.STATE_NOW or o.state == MissionObjective.STATE_ALERT:
+			objective = o.text
+			break
+	var status: String = ""
+	if _snap != null and _phase != PHASE_BUILD:
+		status = "Batería %s · %s" % [UiFormat.fmt_pct(_snap.soc_pct), JsMath.fmt_hour(_snap.hour)]
+	return RemoteProtocol.make_context(label, style, enabled, objective, "paused" if paused else "playing",
+		t.inspect != null, h.kind == HandsState.KIND_METER, t.hands.is_free() or h.kind == HandsState.KIND_METER, status)
 
 
 func _step_sim(dt: float) -> void:
@@ -671,16 +830,16 @@ func _finish(s: SimSnapshot) -> void:
 	_d.audio.set_wind(false)
 	_d.hud.alert.hide()
 	_d.hud.shedding.hide()
-	_hands.clear()
+	for t: Technician in _techs:
+		t.hands.clear()
 	_d.hud.meter.hide()
 	_d.hud.actions.set_meter_on(false)
 	sfx("win" if s.won else "lose")
+	for t: Technician in _techs:
+		t.rig.play_gesture(&"victory" if s.won else &"oops", s.won)
 	if s.won:
-		_rig.play_gesture(&"victory", true)
 		cam_rig.celebrate()
-		WorldFx.glints(_world, player.position + Vector3(0, 1.5, 0), 70)
-	else:
-		_rig.play_gesture(&"oops")
+		WorldFx.glints(_world, _camera_focus() + Vector3(0, 1.5, 0), 70)
 	if not s.won:
 		toast("¡Apagón! La batería se agotó a las %s." % JsMath.fmt_hour(s.hour), &"bad")
 	_changed()
@@ -742,8 +901,16 @@ func _update_interaction() -> void:
 		hud.actions.set_action("Planta en marcha" if _phase == PHASE_RUNNING else "Acercate a algo", &"idle")
 	hud.actions.set_inspect_enabled(pick.inspect != null or hud.inspect.visible)
 	var floor_y: float = _world.floor_at(a.pos.x, a.pos.z) if a != null else 0.0
-	_highlights.set_action(a.pos if a != null else null, floor_y)
-	if a != null:
+	_actor.highlights.set_action(a.pos if a != null else null, floor_y)
+	if _actor.name_tag != null:
+		# Cooperativo: cada técnico muestra su acción en el cartel de su cabeza.
+		var tag: String = a.label if a != null else ""
+		if tag != _last_prompt:
+			_actor.set_tag_action(tag)
+			_last_prompt = tag
+		if _actor != _techs[0]:
+			return
+	elif a != null:
 		if _last_prompt != a.label:
 			hud.prompt.show(a.label)
 			_last_prompt = a.label
@@ -1002,7 +1169,8 @@ func dispose() -> void:
 		return
 	_disposed = true
 	_d.audio.set_wind(false)
-	_hands.clear()
+	for t: Technician in _techs:
+		t.hands.clear()
 	_d.ui.toast.hide()
 	_d.hud.reset()
 	if root.get_parent() != null:

@@ -7,6 +7,8 @@ var root: HBoxContainer
 ## Callable(booster_id: String) -> void.
 var on_use: Callable
 var _last_key: String = ""
+## true = nunca se muestra (modo TV: no hay botón para usarlos desde la tablet).
+var suppressed: bool = false
 
 
 func _init(use_cb: Callable = Callable()) -> void:
@@ -29,7 +31,7 @@ func set_boosters(slots: Array[BoosterSlot]) -> void:
 		c.queue_free()
 	for s: BoosterSlot in slots:
 		root.add_child(_build_button(s))
-	root.visible = not slots.is_empty()
+	root.visible = not slots.is_empty() and not suppressed
 
 
 ## `.bst-btn`: cuadrado oscuro de 56 px con borde blanco, ícono de sol y la cantidad en un

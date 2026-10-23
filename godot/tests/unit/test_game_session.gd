@@ -107,6 +107,49 @@ func test_game_session_mission_tracker_y_pista_no_explotan() -> void:
 	s.dispose()
 
 
+func test_game_session_cooperativo_dos_tecnicos() -> void:
+	var level: LevelDefinition = Levels.casa()
+	var s: GameSession = GameSession.new(_deps(level, Purchase.make(4, 1, false)))
+	var feedback: Array = []
+	s.on_feedback = func(slot: int, kind: StringName, _text: String) -> void: feedback.append([slot, kind])
+
+	var a: Technician = s.add_technician(0, "Ana", Color.RED)
+	check_eq(s.technicians().size(), 1, "el primer asiento usa el técnico que ya estaba")
+	var b: Technician = s.add_technician(1, "Beto", Color.BLUE)
+	check_eq(s.technicians().size(), 2, "el segundo asiento suma otro técnico")
+	check(a.player != b.player and a.hands != b.hands, "cada uno con su cuerpo y sus manos")
+	check_eq(s.technician_for_slot(1), b, "se encuentra por asiento")
+	check(a.name_tag != null and b.name_tag.text == "Beto", "carteles con el nombre")
+
+	# Beto agarra un panel del pallet: sus manos cargan, las de Ana siguen libres.
+	s.take_from_pallet() # con Ana activa (técnico 0)
+	check_eq(a.hands.kind(), HandsState.KIND_CARRY, "Ana carga el panel")
+	var intent: PlayerIntent = PlayerIntent.new()
+	s._bind(b)
+	s.take_from_pallet()
+	s._save_actor()
+	s._bind(a)
+	check_eq(b.hands.kind(), HandsState.KIND_CARRY, "Beto carga otro panel")
+	s.install_panel(s.world().mounts[0])
+	check(a.hands.is_free(), "Ana instaló y quedó con las manos libres")
+	check_eq(b.hands.kind(), HandsState.KIND_CARRY, "Beto sigue cargando el suyo")
+
+	# Un cuadro con los dos moviéndose no explota; el contexto de cada tablet es propio.
+	for _i: int in 5:
+		s.update_multi(0.05, [Vector2(0.5, 0.0), Vector2(-0.5, 0.0)] as Array[Vector2])
+	var ctx_b: Dictionary = s.controller_context(b)
+	check_eq(String(ctx_b["action"]["label"]), "Soltar", "la tablet de Beto ofrece soltar lo que carga")
+	check_eq(String(ctx_b["screen"]), "playing", "pantalla de juego")
+	check(String(ctx_b["objective"]) != "", "lleva el paso actual de la misión")
+
+	# Error de Beto: el aviso va a su asiento (1); intento sin efectos no manda nada raro.
+	intent.tool = true
+	s.apply_intent(b, intent) # multímetro con las manos ocupadas → toast "bad"
+	check(feedback.size() > 0 and feedback[feedback.size() - 1][0] == 1, "el aviso va a la tablet de Beto")
+	check_eq(s.player, a.player, "después de una pulsación vuelve a quedar activo el técnico 0")
+	s.dispose()
+
+
 static func _find_pickup(s: GameSession, kind: StringName) -> Pickup:
 	for p: Pickup in s.world().pickups:
 		if p.kind == kind:

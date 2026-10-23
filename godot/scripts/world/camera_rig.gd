@@ -98,6 +98,11 @@ func celebrate() -> void:
 	_move.tween_property(self, "pitch", 0.34, 1.6)
 
 
+## true mientras corre un movimiento automático (barrido de entrada o festejo).
+func is_moving() -> bool:
+	return (_move != null and _move.is_valid() and _move.is_running()) or _orbit
+
+
 func _kill_move() -> void:
 	if _move != null and _move.is_valid():
 		_move.kill()
