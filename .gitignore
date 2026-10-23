@@ -5,7 +5,7 @@ android/build/
 CLAVES*
 app/dev/out/
 app/dev/ui/out/
-assets/
+/android/assets/
 app/e2e/out/
 godot/tools/remote_test/node_modules/
 godot/tools/remote_test/out/

@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0E2420">
+<title>Misión Energía · Control</title>
+<style>
+@font-face{font-family:'Fredoka';font-weight:600;font-display:swap;src:url(fonts/fredoka-latin-600-normal.woff2) format('woff2')}
+@font-face{font-family:'Nunito';font-weight:700;font-display:swap;src:url(fonts/nunito-latin-700-normal.woff2) format('woff2')}
+:root{
+  --hud:#0E2420; --hud-2:#1F3D37; --line:#2F5A51; --fg:#fff; --muted:#B7CCC6;
+  --sun:#FFB82E; --sun-dark:#B9781A; --ink:#10231F; --leaf:#3FA34D; --warn:#F28C28;
+  --display:'Fredoka','Trebuchet MS',system-ui,sans-serif; --body:'Nunito',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--hud);color:var(--fg);font-family:var(--body);font-weight:700;
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+main{min-height:100%;display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:28px;padding:28px 36px;align-items:start}
+@media (max-width:760px){main{grid-template-columns:1fr;padding:20px}}
+header{grid-column:1/-1;display:flex;align-items:center;gap:16px}
+.sun{width:56px;height:56px;flex:none}
+h1{font-family:var(--display);font-weight:600;font-size:32px;margin:0;line-height:1.05}
+h1 small{display:block;font-family:var(--body);font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--sun)}
+h2{font-family:var(--display);font-weight:600;font-size:20px;margin:0 0 12px}
+.panel{background:var(--hud-2);border:2px solid var(--line);border-radius:20px;padding:20px}
+.status{display:flex;align-items:center;gap:12px;color:var(--muted);min-height:32px;margin-bottom:12px}
+.spin{width:22px;height:22px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--sun);animation:r 0.9s linear infinite;flex:none}
+.spin[hidden]{display:none}
+@keyframes r{to{transform:rotate(1turn)}}
+ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.tv{display:flex;align-items:center;gap:14px;background:var(--hud);border:2px solid var(--line);border-radius:16px;padding:14px 16px}
+.tv .info{flex:1;min-width:0}
+.tv .name{font-family:var(--display);font-size:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tv .meta{color:var(--muted);font-size:15px}
+.tv.last{border-color:var(--sun)}
+.badge{display:inline-block;background:var(--sun);color:var(--ink);border-radius:999px;padding:1px 10px;font-size:12px;margin-left:8px;vertical-align:3px;letter-spacing:.06em;text-transform:uppercase}
+.btn{font-family:var(--display);font-weight:600;font-size:20px;border:none;border-radius:999px;min-height:56px;padding:0 28px;cursor:pointer;
+  background:var(--sun);color:var(--ink);box-shadow:0 5px 0 var(--sun-dark);touch-action:manipulation;white-space:nowrap}
+.btn:active{transform:translateY(3px);box-shadow:0 2px 0 var(--sun-dark)}
+.btn.secondary{background:var(--hud);color:#fff;border:2px solid var(--line);box-shadow:0 4px 0 #0A1A17}
+.btn:disabled{opacity:.5}
+.empty{color:var(--muted);padding:12px 4px;line-height:1.4}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+input{flex:1;min-width:0;font:inherit;font-size:22px;background:var(--hud);color:#fff;border:2px solid var(--line);border-radius:14px;padding:12px 16px;
+  -webkit-user-select:text;user-select:text}
+input:focus{outline:none;border-color:var(--sun)}
+.msg{margin-top:12px;min-height:22px;color:var(--muted);line-height:1.4}
+.msg.bad{color:var(--warn)}
+.help{color:var(--muted);font-size:15px;line-height:1.45;margin:14px 0 0;padding-left:18px}
+.foot{grid-column:1/-1;color:var(--muted);font-size:13px;display:flex;justify-content:space-between;opacity:.8}
+.auto{position:fixed;inset:auto 24px 24px 24px;display:flex;align-items:center;gap:16px;background:var(--sun);color:var(--ink);
+  border-radius:20px;padding:14px 20px;box-shadow:0 8px 24px rgba(0,0,0,.4);font-size:20px}
+.auto[hidden]{display:none}
+.auto span{flex:1}
+.auto .btn{background:var(--ink);color:#fff;box-shadow:none;min-height:48px}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <svg class="sun" viewBox="0 0 64 64" aria-hidden="true"><g stroke="#FFB82E" stroke-width="5" stroke-linecap="round">
+      <path d="M32 4v8M32 52v8M4 32h8M52 32h8M12 12l6 6M46 46l6 6M12 52l6-6M46 18l6-6"/></g><circle cx="32" cy="32" r="13" fill="#FFB82E"/></svg>
+    <h1><small>Misión Energía</small>Control</h1>
+  </header>
+
+  <section class="panel" aria-labelledby="t-teles">
+    <h2 id="t-teles">Teles en esta red</h2>
+    <div class="status"><div class="spin" id="spin"></div><span id="status">Buscando teles…</span></div>
+    <ul id="list"></ul>
+    <div class="row" style="margin-top:16px"><button class="btn secondary" id="rescan">Buscar de nuevo</button></div>
+  </section>
+
+  <section class="panel" aria-labelledby="t-manual">
+    <h2 id="t-manual">Conectar por dirección</h2>
+    <div class="row">
+      <input id="addr" inputmode="decimal" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="192.168.0.23">
+      <button class="btn" id="go">Conectar</button>
+    </div>
+    <div class="msg" id="msg">La dirección aparece en el tele, debajo del código QR.</div>
+    <ul class="help">
+      <li>La tablet y el tele tienen que estar en la misma red Wi-Fi.</li>
+      <li>Si no aparece ningún tele, el router puede tener activado el «aislamiento de clientes» (o red de invitados): conectá ambos a otra red o desactivalo.</li>
+    </ul>
+  </section>
+
+  <div class="foot"><span id="me"></span><span id="ver"></span></div>
+</main>
+
+<div class="auto" id="auto" hidden role="status"><span id="autoText"></span><button class="btn" id="autoCancel">Cancelar</button></div>
+
+<script>
+(function () {
+  'use strict';
+  // Sin la app (navegador de escritorio) se usa un simulador para poder ver la página.
+  var D = window.Discovery || {
+    scan: function () { setTimeout(function () { window.onNativeEvent('scan', [
+      { app: 'mision-energia-tv', v: 1, name: 'Tele del stand', ip: '192.168.0.23', port: 8765, players: 1, max: 2 },
+      { app: 'mision-energia-tv', v: 1, name: 'Tele 2', ip: '192.168.0.31', port: 8765, players: 2, max: 2 }]); }, 600); },
+    probe: function (a) { setTimeout(function () { window.onNativeEvent('probe', { address: a, tv: null }); }, 800); },
+    connect: function (j) { alert('conectar ' + j); },
+    getLast: function () { return JSON.stringify({ app: 'mision-energia-tv', v: 1, name: 'Tele del stand', ip: '192.168.0.23', port: 8765, players: 0, max: 2 }); },
+    getLocalIp: function () { return '192.168.0.40'; },
+    getVersion: function () { return 'web'; }
+  };
+  var $ = function (id) { return document.getElementById(id); };
+  var params = new URLSearchParams(location.search);
+  var last = parseTv(D.getLast());
+  var found = [];
+  var autoTimer = 0, scanTimer = 0, autoCancelled = false, connecting = false;
+
+  function parseTv(s) { try { var t = s ? JSON.parse(s) : null; return t && t.ip ? t : null; } catch (e) { return null; } }
+  function sameTv(a, b) { return a && b && ((a.ip === b.ip && a.port === b.port) || (a.name && a.name === b.name)); }
+
+  function render() {
+    var ul = $('list');
+    ul.textContent = '';
+    var items = found.slice();
+    if (last && !items.some(function (t) { return sameTv(t, last); })) items.push(Object.assign({ offline: true }, last));
+    if (!items.length) {
+      var li = document.createElement('li');
+      li.className = 'empty';
+      li.textContent = 'Todavía no apareció ningún tele. Abrí «Misión Energía TV» en el tele y esperá unos segundos.';
+      ul.appendChild(li);
+      return;
+    }
+    items.forEach(function (tv) {
+      var li = document.createElement('li');
+      li.className = 'tv' + (sameTv(tv, last) ? ' last' : '');
+      var info = document.createElement('div'); info.className = 'info';
+      var name = document.createElement('div'); name.className = 'name'; name.textContent = tv.name || 'Tele';
+      if (sameTv(tv, last)) { var b = document.createElement('span'); b.className = 'badge'; b.textContent = 'último'; name.appendChild(b); }
+      var meta = document.createElement('div'); meta.className = 'meta';
+      meta.textContent = tv.ip + ':' + tv.port + ' · ' + (tv.offline ? 'no responde ahora' : (tv.players + ' de ' + tv.max + ' jugadores'));
+      info.appendChild(name); info.appendChild(meta);
+      var btn = document.createElement('button'); btn.className = 'btn' + (tv.offline ? ' secondary' : '');
+      btn.textContent = tv.offline ? 'Probar' : 'Conectar';
+      btn.onclick = function () { tv.offline ? probe(tv.ip + ':' + tv.port) : connect(tv); };
+      li.appendChild(info); li.appendChild(btn);
+      ul.appendChild(li);
+    });
+  }
+
+  function scan() {
+    clearTimeout(scanTimer);
+    $('spin').hidden = false;
+    $('status').textContent = 'Buscando teles…';
+    D.scan(1500);
+  }
+
+  function connect(tv) {
+    if (connecting) return;
+    connecting = true;
+    clearTimeout(scanTimer); clearInterval(autoTimer);
+    $('status').textContent = 'Conectando con ' + (tv.name || tv.ip) + '…';
+    var clean = { app: tv.app || 'mision-energia-tv', v: tv.v || 1, name: tv.name || 'Tele', ip: tv.ip, port: tv.port, players: tv.players || 0, max: tv.max || 2 };
+    D.connect(JSON.stringify(clean));
+    setTimeout(function () { connecting = false; }, 3000);
+  }
+
+  function probe(address) {
+    var a = (address || '').trim();
+    if (!a) { $('addr').focus(); return; }
+    $('msg').className = 'msg';
+    $('msg').textContent = 'Probando ' + a + '…';
+    $('go').disabled = true;
+    D.probe(a);
+  }
+
+  function startAutoConnect(tv) {
+    if (autoCancelled || connecting || autoTimer) return;
+    var n = 3;
+    $('auto').hidden = false;
+    var tick = function () {
+      $('autoText').textContent = 'Reconectando con ' + (tv.name || tv.ip) + ' en ' + n + '…';
+      if (n-- <= 0) { clearInterval(autoTimer); autoTimer = 0; $('auto').hidden = true; connect(tv); }
+    };
+    tick();
+    autoTimer = setInterval(tick, 1000);
+  }
+
+  window.onNativeEvent = function (type, data) {
+    if (type === 'scan') {
+      found = Array.isArray(data) ? data : [];
+      $('spin').hidden = true;
+      $('status').textContent = found.length ? (found.length === 1 ? '1 tele encontrado' : found.length + ' teles encontrados')
+        : 'No se encontró ningún tele (se sigue buscando)';
+      render();
+      var match = last && found.filter(function (t) { return sameTv(t, last); })[0];
+      // Volver solo al último tele: siempre tras una caída (auto=1) y también al abrir la app.
+      if (match && !autoCancelled) startAutoConnect(match);
+      scanTimer = setTimeout(scan, found.length ? 5000 : 2500);
+    } else if (type === 'probe') {
+      $('go').disabled = false;
+      if (data && data.tv) { $('msg').textContent = 'Encontrado: ' + data.tv.name; connect(data.tv); }
+      else {
+        $('msg').className = 'msg bad';
+        $('msg').textContent = data && data.error === 'invalid' ? 'Dirección inválida. Ejemplo: 192.168.0.23 o 192.168.0.23:8765'
+          : 'No responde ' + (data ? data.address : '') + '. Revisá que el juego esté abierto en el tele y que estén en la misma red.';
+      }
+    }
+  };
+
+  $('rescan').onclick = function () { autoCancelled = false; scan(); };
+  $('go').onclick = function () { probe($('addr').value); };
+  $('addr').onkeydown = function (e) { if (e.key === 'Enter') probe($('addr').value); };
+  $('autoCancel').onclick = function () { autoCancelled = true; clearInterval(autoTimer); autoTimer = 0; $('auto').hidden = true; };
+  if (last) $('addr').value = last.ip + (last.port !== 8765 ? ':' + last.port : '');
+  var ip = D.getLocalIp();
+  $('me').textContent = ip ? 'Esta tablet: ' + ip : 'Esta tablet no tiene red Wi-Fi';
+  $('ver').textContent = 'v' + (D.getVersion() || '');
+  if (params.get('reason') === 'lost' || params.get('reason') === 'error') {
+    $('msg').className = 'msg bad';
+    $('msg').textContent = 'Se perdió la conexión con el tele. Buscándolo de nuevo…';
+  }
+  render();
+  scan();
+})();
+</script>
+</body>
+</html>
