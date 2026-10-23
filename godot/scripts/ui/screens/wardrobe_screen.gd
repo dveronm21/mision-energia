@@ -20,8 +20,7 @@ func _init(deps: WardrobeDeps) -> void:
 	var preview_col: VBoxContainer = VBoxContainer.new()
 	preview_col.add_theme_constant_override("separation", 8)
 	preview_col.add_child(_build_preview())
-	_preview_name = Label.new()
-	_preview_name.text = "Tu técnico"
+	_preview_name = UiTheme.label("Tu técnico", UiTheme.body(800), 14, UiTheme.MUTED)
 	_preview_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	preview_col.add_child(_preview_name)
 	_info = VBoxContainer.new()
@@ -51,10 +50,8 @@ func _section(title: String, slot: StringName) -> VBoxContainer:
 	col.add_theme_constant_override("separation", 8)
 	var head: HBoxContainer = HBoxContainer.new()
 	head.add_theme_constant_override("separation", 8)
-	head.add_child(HudIcon.new(slot, 22.0))
-	var t: Label = Label.new()
-	t.text = title
-	head.add_child(t)
+	head.add_child(HudIcon.new(slot, 22.0, UiTheme.SUN))
+	head.add_child(UiTheme.label(title, UiTheme.display(600), 20))
 	col.add_child(head)
 	var list: HBoxContainer = HBoxContainer.new()
 	list.add_theme_constant_override("separation", 10)
@@ -91,8 +88,8 @@ func _build_preview() -> Control:
 	vp.add_child(light)
 
 	var cam: Camera3D = Camera3D.new()
-	cam.position = Vector3(0.0, 1.5, 1.7)
-	cam.look_at(Vector3(0.0, 1.35, 0.0), Vector3.UP)
+	# Todavía fuera del árbol: `look_at()` no funciona, se arma el transform a mano.
+	cam.transform = Transform3D(Basis.IDENTITY, Vector3(0.0, 1.5, 1.7)).looking_at(Vector3(0.0, 1.35, 0.0), Vector3.UP)
 	cam.fov = 32.0
 	vp.add_child(cam)
 
@@ -172,41 +169,48 @@ static func _color_for_id(id: String, slot: StringName) -> Color:
 	return _default_color(slot)
 
 
+## `.wr-sw`: círculo de color de 52 px con borde blanco y sombra; el equipado con aro de sol;
+## los que no tenés, apagados y con candado; el equipado con tilde.
 func _swatch(slot: StringName, p: Product, label: String, color: Color, owned: bool, on: bool) -> Button:
 	var b: Button = Button.new()
-	b.custom_minimum_size = Vector2(84, 96)
+	b.custom_minimum_size = Vector2(84, 90)
+	UiTheme.style_button(b, StyleBoxEmpty.new())
 	var col: VBoxContainer = VBoxContainer.new()
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.add_theme_constant_override("separation", 4)
 	col.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var dot_wrap: CenterContainer = CenterContainer.new()
-	var dot: ColorRect = ColorRect.new()
-	dot.custom_minimum_size = Vector2(36, 36)
-	dot.color = color
-	dot_wrap.add_child(dot)
-	col.add_child(dot_wrap)
-	if on:
-		var badge: CenterContainer = CenterContainer.new()
-		badge.add_child(HudIcon.new(&"check", 14.0, VisualMaterials.C_OK))
-		col.add_child(badge)
-	elif not owned:
-		var lock_badge: CenterContainer = CenterContainer.new()
-		lock_badge.add_child(HudIcon.new(&"lock", 12.0, Color(1, 1, 1, 0.6)))
-		col.add_child(lock_badge)
-	var name_label: Label = Label.new()
-	name_label.text = label
-	name_label.add_theme_font_size_override("font_size", 11)
+	col.offset_top = 4
+
+	var dot: Panel = Panel.new()
+	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dot.custom_minimum_size = Vector2(52, 52)
+	dot.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var ds: StyleBoxFlat = UiTheme.box(color, 999, 3, Color(1, 1, 1, 0.85))
+	ds.shadow_color = UiTheme.SUN if on else Color(0, 0, 0, 0.3)
+	ds.shadow_size = 4 if on else 0
+	ds.shadow_offset = Vector2.ZERO if on else Vector2(0, 4)
+	dot.add_theme_stylebox_override("panel", ds)
+	if not owned:
+		dot.modulate.a = 0.55
+	col.add_child(dot)
+
+	var name_label: Label = UiTheme.label(label, UiTheme.body(800), 12, Color("#e4ecea"))
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	col.add_child(name_label)
 	b.add_child(col)
-	var bg: StyleBoxFlat = StyleBoxFlat.new()
-	bg.corner_radius_top_left = 12
-	bg.corner_radius_top_right = 12
-	bg.corner_radius_bottom_left = 12
-	bg.corner_radius_bottom_right = 12
-	bg.bg_color = Color(1, 1, 1, 0.12) if on else Color(1, 1, 1, 0.05)
-	b.add_theme_stylebox_override("normal", bg)
-	b.add_theme_stylebox_override("hover", bg)
+
+	if on or not owned:
+		# `.wr-badge`: círculo de 24 px arriba a la derecha (sol con tilde, o gris con candado).
+		var badge: PanelContainer = PanelContainer.new()
+		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		badge.custom_minimum_size = Vector2(24, 24)
+		badge.position = Vector2(56, 0)
+		badge.add_theme_stylebox_override("panel", UiTheme.box(UiTheme.SUN if on else UiTheme.LOCKED, 999, 2, UiTheme.HUD))
+		var bc: CenterContainer = CenterContainer.new()
+		bc.add_child(HudIcon.new(&"check" if on else &"lock", 13.0, UiTheme.INK if on else Color.WHITE))
+		badge.add_child(bc)
+		b.add_child(badge)
 	b.pressed.connect(_on_swatch.bind(slot, p, label, color, owned))
 	return b
 
@@ -228,8 +232,9 @@ func _on_swatch(slot: StringName, p: Product, label: String, color: Color, owned
 		_preview_name.text = "Vista previa: %s" % label
 		for c: Node in _info.get_children():
 			c.queue_free()
-		var cost_row: Label = Label.new()
-		cost_row.text = "Cuesta %s Soles en la tienda." % UiFormat.fmt_int(maxi(0, p.cost_soles))
+		var cost_row: Label = UiTheme.label("Cuesta %s Soles en la tienda." % UiFormat.fmt_int(maxi(0, p.cost_soles)),
+			UiTheme.body(800), 14, Color("#ffd27a"))
+		cost_row.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_info.add_child(cost_row)
 		if _deps.on_shop.is_valid():
 			_info.add_child(UiCommon.action_button("Ir a la tienda", _deps.on_shop, &"secondary", &"cart"))

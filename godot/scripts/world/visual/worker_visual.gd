@@ -35,6 +35,17 @@ var _shadow: MeshInstance3D
 var _phase := 0.0
 var _time := 0.0
 var _walk := 0.0
+## Gesto en curso (&"" = ninguno), su tiempo transcurrido, duración y si se repite.
+var _gesture: StringName = &""
+var _g_time := 0.0
+var _g_len := 0.0
+var _g_loop := false
+
+## Gestos: festejo (brazos arriba con saltito), "uy" (mano a la cabeza y sacudida de cabeza),
+## "dale" (pulgar arriba con el brazo derecho) y baile de victoria (en bucle).
+const GESTURE_LEN: Dictionary[StringName, float] = {
+	&"cheer": 1.3, &"oops": 1.1, &"thumbs": 0.9, &"victory": 1.6,
+}
 
 
 func _init(helmet: Color = VisualMaterials.C_SUN, vest: Color = VisualMaterials.C_ORANGE) -> void:
@@ -83,6 +94,74 @@ func set_cosmetics(helmet: Color, vest: Color) -> void:
 
 func bone(bone_name: StringName) -> Node3D:
 	return _bones.get(bone_name) as Node3D
+
+
+## Dispara un gesto (ver `GESTURE_LEN`). `loop` lo repite hasta `stop_gesture()`. Un gesto nuevo
+## reemplaza al anterior; mientras carga algo, solo se mueve la cabeza (no suelta el cajón).
+func play_gesture(gesture: StringName, loop: bool = false) -> void:
+	if not GESTURE_LEN.has(gesture):
+		return
+	_gesture = gesture
+	_g_time = 0.0
+	_g_len = GESTURE_LEN[gesture]
+	_g_loop = loop
+
+
+func stop_gesture() -> void:
+	_gesture = &""
+
+
+func gesture() -> StringName:
+	return _gesture
+
+
+## Peso de mezcla del gesto: entra en 0,15 s y sale en los últimos 0,25 s.
+func _gesture_weight() -> float:
+	if _g_loop:
+		return clampf(_g_time / 0.15, 0.0, 1.0)
+	return clampf(_g_time / 0.15, 0.0, 1.0) * clampf((_g_len - _g_time) / 0.25, 0.0, 1.0)
+
+
+## Ángulos del gesto en curso (solo los huesos que mueve) y alto extra de cadera.
+func _gesture_pose(carrying: bool) -> Dictionary:
+	var t := _g_time
+	var out: Dictionary = {}
+	match _gesture:
+		&"cheer":
+			var wave := sin(t * 14.0) * 0.18
+			if not carrying:
+				out[&"arm_l"] = Vector3(-2.75 + wave, 0, 0.35)
+				out[&"arm_r"] = Vector3(-2.75 - wave, 0, -0.35)
+				out[&"forearm_l"] = Vector3(-0.25, 0, 0)
+				out[&"forearm_r"] = Vector3(-0.25, 0, 0)
+			out[&"head"] = Vector3(-0.25, 0, 0)
+			out[&"torso"] = Vector3(-0.12, 0, 0)
+			# Saltito: dos rebotes rápidos.
+			out[&"hop"] = maxf(0.0, sin(t * TAU * 1.6)) * 0.16
+		&"oops":
+			if not carrying:
+				out[&"arm_r"] = Vector3(-2.4, 0, -0.5)
+				out[&"forearm_r"] = Vector3(-1.9, 0, 0)
+				out[&"arm_l"] = Vector3(0.1, 0, 0.42)
+			out[&"head"] = Vector3(0.18, sin(t * 16.0) * 0.38, sin(t * 8.0) * 0.12)
+			out[&"torso"] = Vector3(0.14, 0, 0)
+		&"thumbs":
+			if not carrying:
+				out[&"arm_r"] = Vector3(-1.45, 0, -0.35)
+				out[&"forearm_r"] = Vector3(-1.2, 0.4, 0)
+			out[&"head"] = Vector3(-0.1, -0.2, 0.12)
+		&"victory":
+			var beat := sin(t * TAU / 0.8)
+			if not carrying:
+				out[&"arm_l"] = Vector3(-2.9, 0, 0.5 + beat * 0.25)
+				out[&"arm_r"] = Vector3(-2.9, 0, -0.5 + beat * 0.25)
+				out[&"forearm_l"] = Vector3(-0.4, 0, 0)
+				out[&"forearm_r"] = Vector3(-0.4, 0, 0)
+			out[&"hips"] = Vector3(0, beat * 0.35, 0)
+			out[&"torso"] = Vector3(-0.1, -beat * 0.2, beat * 0.08)
+			out[&"head"] = Vector3(-0.2, beat * 0.25, 0)
+			out[&"hop"] = absf(sin(t * TAU / 0.8)) * 0.12
+	return out
 
 
 func _process(dt: float) -> void:
@@ -141,7 +220,24 @@ func animate(dt: float, spd: float, p: Pose) -> void:
 		&"hips": hips, &"torso": torso, &"head": head, &"arm_l": arm_l, &"forearm_l": forearm_l,
 		&"arm_r": arm_r, &"forearm_r": forearm_r, &"leg_l": leg_l, &"shin_l": shin_l, &"leg_r": leg_r, &"shin_r": shin_r,
 	}
-	var k := 1.0 - exp(-12.0 * dt)
+	# Gesto encima de la marcha: se mezcla por hueso con su peso (entrada y salida suaves).
+	var hop := 0.0
+	if _gesture != &"":
+		_g_time += dt
+		if _g_time >= _g_len:
+			if _g_loop:
+				_g_time = fmod(_g_time, _g_len)
+			else:
+				_gesture = &""
+		if _gesture != &"":
+			var w := _gesture_weight()
+			var g := _gesture_pose(p == Pose.CARRY)
+			for b: StringName in g.keys():
+				if b == &"hop":
+					hop = float(g[b]) * w
+				elif t.has(b):
+					t[b] = t[b].lerp(g[b], w)
+	var k := 1.0 - exp(-(18.0 if _gesture != &"" else 12.0) * dt)
 	for b: StringName in BONES:
 		var cur: Vector3 = _cur[b].lerp(t[b], k)
 		_cur[b] = cur
@@ -150,5 +246,6 @@ func animate(dt: float, spd: float, p: Pose) -> void:
 			n.rotation = cur
 	var hips_node: Node3D = _bones.get(&"hips")
 	if hips_node != null:
-		hips_node.position.y = HIP_Y + (absf(c) * 0.045 - 0.03) * amp + breath * 0.003 * still
-	_shadow.scale = Vector3.ONE * (1.0 - 0.08 * amp * absf(c))
+		hips_node.position.y = HIP_Y + (absf(c) * 0.045 - 0.03) * amp + breath * 0.003 * still + hop
+	# La sombra de contacto se achica cuando salta (se siente el despegue).
+	_shadow.scale = Vector3.ONE * (1.0 - 0.08 * amp * absf(c)) * (1.0 - hop * 1.8)

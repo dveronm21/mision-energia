@@ -17,7 +17,32 @@ func _init(name_: StringName = &"star", size_px: float = 24.0, color: Color = Co
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
+## true = usa el arte con volumen de `IconArt` cuando existe (false = siempre el trazo fino).
+@export var use_art: bool = true
+
+
+## Ícono con volumen: sombra fija, cuerpo teñido con `stroke_color` y brillo blanco encima
+## (más suave en íconos oscuros, para que no se vean grisáceos). Se rasteriza al doble del
+## tamaño en pantalla: nítido también en teléfonos con mucha densidad.
+func _draw_art() -> void:
+	var side: float = minf(size.x, size.y)
+	var px: int = int(ceilf(side * 2.0))
+	var rect: Rect2 = Rect2((size - Vector2(side, side)) / 2.0 - Vector2(0, side * 1.5 / 64.0), Vector2(side, side * 67.0 / 64.0))
+	var shadow: ImageTexture = IconArt.texture(icon_name, &"shadow", px)
+	var body: ImageTexture = IconArt.texture(icon_name, &"body", px)
+	var gloss: ImageTexture = IconArt.texture(icon_name, &"gloss", px)
+	if shadow != null:
+		draw_texture_rect(shadow, rect, false, Color(1, 1, 1, stroke_color.a))
+	if body != null:
+		draw_texture_rect(body, rect, false, stroke_color)
+	if gloss != null:
+		draw_texture_rect(gloss, rect, false, Color(1, 1, 1, stroke_color.a * (0.35 + 0.65 * stroke_color.get_luminance())))
+
+
 func _draw() -> void:
+	if use_art and IconArt.has_icon(icon_name):
+		_draw_art()
+		return
 	var s: Vector2 = size
 	var c: Vector2 = s / 2.0
 	var r: float = minf(s.x, s.y) / 2.0 - stroke_width
@@ -31,9 +56,10 @@ func _draw() -> void:
 			var dir: Vector2 = Vector2(1, 1).normalized()
 			draw_line(lens_c + dir * r * 0.55, lens_c + dir * r * 1.15, stroke_color, stroke_width, true)
 		&"pause":
-			var w: float = r * 0.5
-			draw_rect(Rect2(c + Vector2(-r * 0.55, -r * 0.75), Vector2(w, r * 1.5)), stroke_color)
-			draw_rect(Rect2(c + Vector2(r * 0.05, -r * 0.75), Vector2(w, r * 1.5)), stroke_color)
+			# Dos barras con un hueco bien visible (en 20-24 px se veían como un bloque).
+			var w: float = r * 0.38
+			draw_rect(Rect2(c + Vector2(-r * 0.62, -r * 0.75), Vector2(w, r * 1.5)), stroke_color)
+			draw_rect(Rect2(c + Vector2(r * 0.24, -r * 0.75), Vector2(w, r * 1.5)), stroke_color)
 		&"minus":
 			draw_line(c + Vector2(-r * 0.6, 0.0), c + Vector2(r * 0.6, 0.0), stroke_color, stroke_width * 1.3, true)
 		&"plus":
@@ -148,18 +174,34 @@ func _draw() -> void:
 			draw_rect(Rect2(c + Vector2(r * 0.6, -r * 0.25), Vector2(r * 0.2, r * 0.5)), stroke_color)
 			draw_line(c + Vector2(-r * 0.1, -r * 0.3), c + Vector2(-r * 0.1, r * 0.3), stroke_color, stroke_width, true)
 			draw_line(c + Vector2(-r * 0.4, 0.0), c + Vector2(r * 0.2, 0.0), stroke_color, stroke_width, true)
+		&"panel":
+			# Panel solar en perspectiva: trapecio con grilla de 3×2 celdas.
+			var tl: Vector2 = c + Vector2(-r * 0.6, -r * 0.7)
+			var tr: Vector2 = c + Vector2(r * 0.6, -r * 0.7)
+			var br: Vector2 = c + Vector2(r * 0.9, r * 0.5)
+			var bl: Vector2 = c + Vector2(-r * 0.9, r * 0.5)
+			draw_polyline(PackedVector2Array([tl, tr, br, bl, tl]), stroke_color, stroke_width, true)
+			for k: int in [1, 2]:
+				var t: float = k / 3.0
+				draw_line(tl.lerp(tr, t), bl.lerp(br, t), stroke_color, stroke_width * 0.8, true)
+			draw_line(tl.lerp(bl, 0.5), tr.lerp(br, 0.5), stroke_color, stroke_width * 0.8, true)
+			draw_line(c + Vector2(0.0, r * 0.5), c + Vector2(0.0, r * 0.9), stroke_color, stroke_width, true)
 		&"coins":
 			draw_arc(c + Vector2(-r * 0.25, r * 0.2), r * 0.5, 0.0, TAU, 20, stroke_color, stroke_width, true)
 			draw_arc(c + Vector2(r * 0.25, -r * 0.2), r * 0.5, 0.0, TAU, 20, stroke_color, stroke_width, true)
+		&"star_fill":
+			_draw_star(c, r, true)
 		_:
 			_draw_star(c, r)
 
 
-func _draw_star(c: Vector2, r: float) -> void:
+func _draw_star(c: Vector2, r: float, filled: bool = false) -> void:
 	var pts: PackedVector2Array = PackedVector2Array()
 	for i: int in 10:
 		var a: float = (float(i) / 10.0) * TAU - PI / 2.0
 		var rr: float = r if i % 2 == 0 else r * 0.45
 		pts.append(c + Vector2(cos(a), sin(a)) * rr)
+	if filled:
+		draw_colored_polygon(pts, stroke_color)
 	pts.append(pts[0])
 	draw_polyline(pts, stroke_color, stroke_width, true)

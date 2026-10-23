@@ -2,6 +2,9 @@ class_name AudioSynth
 extends Node
 ## Audio sintetizado sin archivos (equivale a `SynthAudio` de `Audio.ts`).
 ##
+## - Sobre la web: efectos extra (`EXTRA_RECIPES`), pulido de cada efecto (`polish()`),
+##   variación de tono por reproducción, y grabaciones opcionales en `res://assets/sfx/`.
+##
 ## - Los efectos se generan con las mismas recetas de la web (osciladores con envolvente
 ##   exponencial) y se empujan a un `AudioStreamGenerator`.
 ## - Viento (Zonda): ruido blanco por un filtro pasabanda de 500 Hz (Q 0,7), con fundido.
@@ -48,6 +51,38 @@ const SFX_RECIPES: Dictionary[String, Array] = {
 	"click": [[1800.0, 0.03, "triangle", 0.05, 0.0, 0.0]],
 }
 
+## Efectos propios de la versión Godot (no están en la web). Misma forma de receta; la onda
+## "noise" es ruido blanco (la frecuencia se ignora).
+const EXTRA_RECIPES: Dictionary[String, Array] = {
+	# Chispa al conectar: chasquido de ruido + zumbido eléctrico que cae.
+	"spark": [[0.0, 0.06, "noise", 0.16, 0.0, 0.0], [2400.0, 0.12, "square", 0.035, 0.0, 600.0], [0.0, 0.04, "noise", 0.08, 0.09, 0.0]],
+	# Barrido de cámara al entrar al nivel.
+	"whoosh": [[0.0, 0.55, "noise", 0.07, 0.0, 0.0], [180.0, 0.55, "sine", 0.06, 0.0, 420.0]],
+	# Pop corto de tarjeta o modal.
+	"pop": [[420.0, 0.07, "sine", 0.14, 0.0, 900.0]],
+	# Estrellas del resultado: campanitas que suben una nota por estrella.
+	"star_1": [[784.0, 0.32, "triangle", 0.12, 0.0, 0.0], [1568.0, 0.24, "sine", 0.05, 0.02, 0.0]],
+	"star_2": [[988.0, 0.32, "triangle", 0.12, 0.0, 0.0], [1976.0, 0.24, "sine", 0.05, 0.02, 0.0]],
+	"star_3": [[1175.0, 0.42, "triangle", 0.13, 0.0, 0.0], [2349.0, 0.32, "sine", 0.06, 0.02, 0.0], [1568.0, 0.42, "triangle", 0.07, 0.08, 0.0]],
+	# Confeti: ráfaga de ruido + arpegio brillante.
+	"confetti": [
+		[0.0, 0.25, "noise", 0.09, 0.0, 0.0],
+		[1046.0, 0.18, "triangle", 0.07, 0.04, 0.0], [1319.0, 0.18, "triangle", 0.07, 0.1, 0.0],
+		[1568.0, 0.18, "triangle", 0.07, 0.16, 0.0], [2093.0, 0.3, "triangle", 0.07, 0.22, 0.0],
+	],
+}
+
+## Carpeta de efectos grabados: si existe `<nombre>.ogg` o `<nombre>.wav`, suena ese archivo
+## en vez del sintetizado (así se pueden sumar grabaciones sin tocar código).
+const SFX_DIR: String = "res://assets/sfx/"
+const FILE_VOICES: int = 6
+const FILE_VOLUME_DB: float = -10.0
+## Variación de tono por reproducción (±), para que un efecto repetido no suene idéntico.
+const PITCH_JITTER: float = 0.035
+## Pulido: suavizado de agudos (filtro de un polo), saturación suave y eco corto de sala.
+const POLISH_LOWPASS: float = 0.55
+const POLISH_ECHOES: Array[Vector2] = [Vector2(0.067, 0.22), Vector2(0.131, 0.11), Vector2(0.211, 0.05)]
+
 const WIND_FREQ: float = 500.0
 const WIND_Q: float = 0.7
 const WIND_GAIN: float = 0.12
@@ -80,6 +115,12 @@ var _x1: float = 0.0
 var _x2: float = 0.0
 var _y1: float = 0.0
 var _y2: float = 0.0
+## Efectos ya sintetizados y pulidos (se generan una vez por nombre).
+var _polished: Dictionary[String, PackedFloat32Array] = {}
+## Archivos grabados encontrados en `SFX_DIR` (null = se buscó y no hay).
+var _files: Dictionary[String, Variant] = {}
+var _voices: Array[AudioStreamPlayer] = []
+var _next_voice: int = 0
 
 
 ## Inyecta el guardado para el mute persistente (puede ser null).
@@ -131,10 +172,79 @@ func _ensure_playing() -> void:
 func play(sfx_name: String) -> void:
 	if not _unlocked or _muted:
 		return
-	if not SFX_RECIPES.has(sfx_name):
+	var recipe: Array = SFX_RECIPES.get(sfx_name, EXTRA_RECIPES.get(sfx_name, []))
+	if recipe.is_empty():
 		push_warning("AudioSynth: efecto desconocido '%s'" % sfx_name)
 		return
-	_mix_in(render_recipe(SFX_RECIPES[sfx_name], MIX_RATE))
+	if _play_file(sfx_name):
+		return
+	if not _polished.has(sfx_name):
+		_polished[sfx_name] = polish(render_recipe(recipe, MIX_RATE), MIX_RATE)
+	_mix_in(_repitch(_polished[sfx_name], 1.0 + _rng.randf_range(-PITCH_JITTER, PITCH_JITTER)))
+
+
+## Reproduce la grabación de `SFX_DIR` si existe. true = sonó el archivo.
+func _play_file(sfx_name: String) -> bool:
+	if not _files.has(sfx_name):
+		_files[sfx_name] = null
+		for ext: String in ["ogg", "wav"]:
+			var path: String = "%s%s.%s" % [SFX_DIR, sfx_name, ext]
+			if ResourceLoader.exists(path):
+				_files[sfx_name] = load(path) as AudioStream
+				break
+	var stream: AudioStream = _files[sfx_name] as AudioStream
+	if stream == null or not is_inside_tree():
+		return false
+	if _voices.is_empty():
+		for i: int in FILE_VOICES:
+			var v: AudioStreamPlayer = AudioStreamPlayer.new()
+			v.name = "FileVoice%d" % i
+			# Las grabaciones vienen mucho más fuertes que la síntesis (picos de ~0,1).
+			v.volume_db = FILE_VOLUME_DB
+			add_child(v)
+			_voices.append(v)
+	var voice: AudioStreamPlayer = _voices[_next_voice]
+	_next_voice = (_next_voice + 1) % _voices.size()
+	voice.stream = stream
+	voice.pitch_scale = 1.0 + _rng.randf_range(-PITCH_JITTER, PITCH_JITTER)
+	voice.play()
+	return true
+
+
+## Pulido de un efecto sintetizado: filtro pasabajos de un polo (redondea cuadradas y
+## sierras), saturación suave (`tanh`, más cuerpo sin recortar) y tres ecos cortos que lo
+## ubican en un lugar en vez de sonar "pegado al parlante". Agrega la cola del eco.
+static func polish(samples: PackedFloat32Array, mix_rate: float) -> PackedFloat32Array:
+	var tail: int = int(POLISH_ECHOES[POLISH_ECHOES.size() - 1].x * mix_rate) + 1
+	var out: PackedFloat32Array = PackedFloat32Array()
+	out.resize(samples.size() + tail)
+	var lp: float = 0.0
+	for i: int in samples.size():
+		lp += (samples[i] - lp) * POLISH_LOWPASS
+		out[i] = tanh(lp * 1.6) / 1.6
+	var dry: PackedFloat32Array = out.duplicate()
+	for e: Vector2 in POLISH_ECHOES:
+		var d: int = int(e.x * mix_rate)
+		for i: int in range(0, out.size() - d):
+			out[i + d] += dry[i] * e.y
+	return out
+
+
+## Cambia el tono (y la duración) por interpolación lineal: `k` > 1 más agudo.
+static func _repitch(samples: PackedFloat32Array, k: float) -> PackedFloat32Array:
+	if absf(k - 1.0) < 0.001:
+		return samples
+	var n: int = int(samples.size() / k)
+	var out: PackedFloat32Array = PackedFloat32Array()
+	out.resize(n)
+	for i: int in n:
+		var x: float = i * k
+		var j: int = int(x)
+		var f: float = x - j
+		var a: float = samples[j]
+		var b: float = samples[mini(j + 1, samples.size() - 1)]
+		out[i] = a + (b - a) * f
+	return out
 
 
 func set_wind(on: bool) -> void:
@@ -212,8 +322,11 @@ static func _render_tone(out: PackedFloat32Array, rate: float, freq: float, dur:
 		vol: float, when: float, slide_to: float) -> void:
 	var start: int = int(round(when * rate))
 	var count: int = int(ceil((dur + STOP_TAIL_SEC) * rate))
-	var attack: float = 0.01
+	var attack: float = 0.01 if wave != "noise" else 0.002
 	var phase: float = 0.0
+	# Ruido determinístico por tono (mismo sonido en cada render: se puede cachear y testear).
+	var noise: RandomNumberGenerator = RandomNumberGenerator.new()
+	noise.seed = hash(Vector3(freq, dur, when))
 	for i: int in count:
 		var idx: int = start + i
 		if idx >= out.size():
@@ -231,7 +344,7 @@ static func _render_tone(out: PackedFloat32Array, rate: float, freq: float, dur:
 			g = vol * pow(WIND_FLOOR / vol, (t - attack) / maxf(dur - attack, 1e-6))
 		else:
 			g = WIND_FLOOR
-		out[idx] += g * _osc(wave, phase)
+		out[idx] += g * (noise.randf_range(-1.0, 1.0) if wave == "noise" else _osc(wave, phase))
 		phase = fmod(phase + f / rate, 1.0)
 
 

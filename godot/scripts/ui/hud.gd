@@ -36,7 +36,7 @@ func _init(cb: HudCallbacks = HudCallbacks.new()) -> void:
 	top_margin.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	top_margin.mouse_filter = Control.MOUSE_FILTER_PASS
 	for side: String in ["left", "top", "right"]:
-		top_margin.add_theme_constant_override("margin_%s" % side, 18)
+		top_margin.add_theme_constant_override("margin_%s" % side, 12)
 
 	var top_lane: HBoxContainer = HBoxContainer.new()
 	top_lane.add_theme_constant_override("separation", 12)
@@ -58,17 +58,22 @@ func _init(cb: HudCallbacks = HudCallbacks.new()) -> void:
 
 	_alert_real = AlertBanner.new()
 	alert = _alert_real
+	# Carril superior central (`.hud-lane-top`): entre la misión y las estadísticas, 12 px abajo
+	# del borde. Ancla al centro con márgenes simétricos para que quede centrado sea cual sea su
+	# alto.
 	_alert_real.root.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_alert_real.root.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_alert_real.root.position = Vector2(-220, 18)
-	_alert_real.root.custom_minimum_size = Vector2(440, 0)
+	_alert_real.root.offset_left = -230
+	_alert_real.root.offset_right = 230
+	_alert_real.root.offset_top = 12
+	_alert_real.root.offset_bottom = 12
+	_alert_real.root.grow_vertical = Control.GROW_DIRECTION_END
 	root.add_child(_alert_real.root)
 
 	joystick = Joystick.new()
 	joystick.mouse_filter = Control.MOUSE_FILTER_STOP
 	joystick.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	joystick.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	joystick.position = Vector2(36, -160)
+	joystick.position = Vector2(20, -152)
 	if cb.on_joystick.is_valid():
 		joystick.on_change = cb.on_joystick
 	root.add_child(joystick)
@@ -77,25 +82,30 @@ func _init(cb: HudCallbacks = HudCallbacks.new()) -> void:
 	boosters = _boosters_real
 	_boosters_real.root.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	_boosters_real.root.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_boosters_real.root.position = Vector2(36, -190)
+	_boosters_real.root.position = Vector2(12, -222)
 	root.add_child(_boosters_real.root)
 
 	_actions_real = ActionButtons.new(cb.on_action, cb.on_inspect, cb.on_meter, cb.on_pause)
 	actions = _actions_real
 	_actions_real.root.mouse_filter = Control.MOUSE_FILTER_STOP
 	root.add_child(_actions_real.root)
-	_actions_real.pause_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_actions_real.pause_button.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	top_lane.add_child(_actions_real.pause_button)
 
 	# Carril inferior central: multímetro, ficha y "Salvá la ciudad", apilados de abajo hacia
 	# arriba para que no se tapen si llegan a coincidir.
+	# Pegado abajo al centro (entre joystick y botonera) y creciendo hacia arriba; cada panel
+	# centrado en el carril.
 	var bottom_lane: VBoxContainer = VBoxContainer.new()
 	bottom_lane.add_theme_constant_override("separation", 10)
+	bottom_lane.alignment = BoxContainer.ALIGNMENT_END
 	bottom_lane.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	bottom_lane.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	bottom_lane.offset_left = -230
+	bottom_lane.offset_right = 230
+	bottom_lane.offset_top = -16
+	bottom_lane.offset_bottom = -16
 	bottom_lane.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	bottom_lane.position = Vector2(-160, -220)
-	bottom_lane.mouse_filter = Control.MOUSE_FILTER_PASS
+	bottom_lane.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	_shedding_real = LoadSheddingPanel.new(cb.on_toggle_load)
 	shedding = _shedding_real
@@ -110,5 +120,7 @@ func _init(cb: HudCallbacks = HudCallbacks.new()) -> void:
 	_meter_real = MeterView.new()
 	meter = _meter_real
 	bottom_lane.add_child(_meter_real.root)
+	for panel: Control in [_shedding_real.root, _inspect_real.root, _meter_real.root]:
+		panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 
 	root.add_child(bottom_lane)

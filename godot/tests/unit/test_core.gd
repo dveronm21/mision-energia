@@ -120,6 +120,21 @@ func test_audio_recetas() -> void:
 	check_eq(click.size(), int(ceil(0.08 * 22050.0)), "duración click = 30 ms + cola")
 
 
+func test_audio_efectos_extra_y_pulido() -> void:
+	for n: String in AudioSynth.EXTRA_RECIPES.keys():
+		check(not AudioSynth.SFX_RECIPES.has(n), "%s no pisa una receta de la web" % n)
+		var raw: PackedFloat32Array = AudioSynth.render_recipe(AudioSynth.EXTRA_RECIPES[n], AudioSynth.MIX_RATE)
+		var rich: PackedFloat32Array = AudioSynth.polish(raw, AudioSynth.MIX_RATE)
+		var peak: float = 0.0
+		for x: float in rich:
+			peak = maxf(peak, absf(x))
+		check(rich.size() > raw.size(), "%s: el pulido agrega la cola del eco" % n)
+		check(peak > 0.01 and peak < 1.0, "%s audible y sin saturar (pico %f)" % [n, peak])
+	var a: PackedFloat32Array = AudioSynth.render_recipe(AudioSynth.EXTRA_RECIPES["spark"], AudioSynth.MIX_RATE)
+	var b: PackedFloat32Array = AudioSynth.render_recipe(AudioSynth.EXTRA_RECIPES["spark"], AudioSynth.MIX_RATE)
+	check(a == b, "el ruido es determinístico (se puede cachear)")
+
+
 func _cleanup() -> void:
 	var dir: DirAccess = DirAccess.open(TEST_DIR)
 	if dir == null:

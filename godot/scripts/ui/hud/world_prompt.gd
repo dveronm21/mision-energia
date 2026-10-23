@@ -18,19 +18,11 @@ func _init() -> void:
 	root = PanelContainer.new()
 	root.name = "hud-prompt"
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var bg: StyleBoxFlat = StyleBoxFlat.new()
-	bg.bg_color = Color(0, 0, 0, 0.72)
-	bg.corner_radius_top_left = 10
-	bg.corner_radius_top_right = 10
-	bg.corner_radius_bottom_left = 10
-	bg.corner_radius_bottom_right = 10
-	bg.content_margin_left = 12
-	bg.content_margin_right = 12
-	bg.content_margin_top = 6
-	bg.content_margin_bottom = 6
+	# `.hud-prompt`: etiqueta amarilla con texto oscuro y labio ocre.
+	var bg: StyleBoxFlat = UiTheme.lipped(UiTheme.SUN, UiTheme.SUN_DARK, 3, 10, 0, Color.TRANSPARENT, 10.0, 5.0)
 	root.add_theme_stylebox_override("panel", bg)
 	root.visible = false
-	_label = Label.new()
+	_label = UiTheme.label("", UiTheme.body(800), 14, UiTheme.INK)
 	root.add_child(_label)
 
 

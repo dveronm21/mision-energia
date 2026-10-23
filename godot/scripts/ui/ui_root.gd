@@ -24,6 +24,9 @@ func _init(audio: AudioSynth = null) -> void:
 	root = Control.new()
 	root.name = "ui-root"
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Fuentes y colores por defecto de toda la UI (pantallas, HUD y toast).
+	root.theme = UiTheme.build()
 
 	hud_layer = _layer("ui-hud")
 	hud_layer.visible = false
@@ -40,13 +43,17 @@ func _init(audio: AudioSynth = null) -> void:
 	toast = Toast.new()
 	toast.root.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	toast.root.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	toast.root.offset_top = 12
 	top_layer.add_child(toast.root)
 
 
+## Las capas no atrapan toques: los toman las pantallas y los controles del HUD, y lo que sobra
+## llega al mundo 3D (la cámara escucha `_unhandled_input`).
 func _layer(layer_name: String) -> Control:
 	var c: Control = Control.new()
 	c.name = layer_name
 	c.set_anchors_preset(Control.PRESET_FULL_RECT)
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return c
 
 

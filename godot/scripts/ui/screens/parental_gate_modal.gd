@@ -17,7 +17,6 @@ var _fails: int = 0
 var _question_label: Label
 var _display: Label
 var _msg: Label
-var _card_bg: StyleBoxFlat
 var _card: PanelContainer
 
 
@@ -28,103 +27,90 @@ func _init(gate: ParentalGate) -> void:
 	root = Control.new()
 	root.name = "parental-gate"
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var dim: ColorRect = ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.65)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.add_child(dim)
-
-	var center: CenterContainer = CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.add_child(center)
-
-	_card = PanelContainer.new()
-	_card_bg = StyleBoxFlat.new()
-	_card_bg.bg_color = Color("#13302a")
-	_card_bg.corner_radius_top_left = 20
-	_card_bg.corner_radius_top_right = 20
-	_card_bg.corner_radius_bottom_left = 20
-	_card_bg.corner_radius_bottom_right = 20
-	_card_bg.content_margin_left = 26
-	_card_bg.content_margin_right = 26
-	_card_bg.content_margin_top = 22
-	_card_bg.content_margin_bottom = 22
-	_card.add_theme_stylebox_override("panel", _card_bg)
+	# `.pgm`: tarjeta blanca de 600 px; a la izquierda la cuenta y el visor, a la derecha el teclado.
+	var content: VBoxContainer = UiCommon.modal_card(root, 600.0, 22.0, 0)
+	_card = content.get_parent() as PanelContainer
 
 	var row: HBoxContainer = HBoxContainer.new()
-	row.add_theme_constant_override("separation", 24)
+	row.add_theme_constant_override("separation", 20)
 
 	var left: VBoxContainer = VBoxContainer.new()
-	left.add_theme_constant_override("separation", 10)
-	left.custom_minimum_size = Vector2(260, 0)
-	var eyebrow: Label = Label.new()
-	eyebrow.text = "Sólo personas adultas"
-	eyebrow.add_theme_font_size_override("font_size", 12)
-	eyebrow.add_theme_color_override("font_color", Color(1, 1, 1, 0.6))
-	left.add_child(eyebrow)
-	var title: Label = Label.new()
-	title.text = "Pedile ayuda a un adulto"
-	title.add_theme_font_size_override("font_size", 20)
-	left.add_child(title)
-	_question_label = Label.new()
+	left.add_theme_constant_override("separation", 8)
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left.alignment = BoxContainer.ALIGNMENT_CENTER
+	left.add_child(UiTheme.eyebrow("Sólo personas adultas", UiTheme.SUN_INK))
+	left.add_child(UiTheme.title("Pedile ayuda a un adulto", 24, UiTheme.INK))
+	_question_label = UiTheme.label("", UiTheme.display(600), 28, UiTheme.INK)
 	_question_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	left.add_child(_question_label)
-	_display = Label.new()
-	_display.text = "?"
-	_display.add_theme_font_size_override("font_size", 34)
+	# `.pgm-display`: visor con borde oscuro de 3 px.
+	_display = UiTheme.label("?", UiTheme.display(700), 36, UiTheme.INK)
 	_display.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var display_bg: PanelContainer = PanelContainer.new()
-	var display_style: StyleBoxFlat = StyleBoxFlat.new()
-	display_style.bg_color = Color(0, 0, 0, 0.3)
-	display_style.corner_radius_top_left = 10
-	display_style.corner_radius_top_right = 10
-	display_style.corner_radius_bottom_left = 10
-	display_style.corner_radius_bottom_right = 10
-	display_style.content_margin_top = 8
-	display_style.content_margin_bottom = 8
+	display_bg.custom_minimum_size.x = 140
+	display_bg.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	var display_style: StyleBoxFlat = UiTheme.box(Color.WHITE, 14, 3, UiTheme.INK)
+	display_style.content_margin_left = 14
+	display_style.content_margin_right = 14
+	display_style.content_margin_top = 4
+	display_style.content_margin_bottom = 4
 	display_bg.add_theme_stylebox_override("panel", display_style)
 	display_bg.add_child(_display)
 	left.add_child(display_bg)
-	_msg = Label.new()
-	_msg.add_theme_color_override("font_color", VisualMaterials.C_BAD)
+	_msg = UiTheme.label("", UiTheme.body(800), 14, Color("#9a4a06"))
+	_msg.custom_minimum_size.y = 20
 	_msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	left.add_child(_msg)
-	left.add_child(UiCommon.action_button("Cancelar", _on_cancel, &"ghost"))
+	var cancel: Button = UiCommon.action_button("Cancelar", _on_cancel, &"ghost_ink")
+	cancel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	left.add_child(cancel)
 	row.add_child(left)
 
 	row.add_child(_build_keypad())
-	_card.add_child(row)
-	center.add_child(_card)
+	content.add_child(row)
 
 	root.gui_input.connect(_on_gui_input)
 	_new_question()
 
 
+## `.pgm-keys`: teclas de 64×52 con labio; borrar en gris y aceptar en verde.
 func _build_keypad() -> GridContainer:
 	var grid: GridContainer = GridContainer.new()
 	grid.columns = 3
+	grid.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	grid.add_theme_constant_override("h_separation", 8)
 	grid.add_theme_constant_override("v_separation", 8)
 	var keys: Array[String] = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "del", "0", "ok"]
 	for k: String in keys:
 		var b: Button = Button.new()
-		b.custom_minimum_size = Vector2(64, 56)
+		b.custom_minimum_size = Vector2(64, 52)
 		match k:
 			"del":
-				var ic: CenterContainer = CenterContainer.new()
-				ic.add_child(HudIcon.new(&"back", 22.0))
-				b.add_child(ic)
+				UiTheme.style_button(b, UiTheme.lipped(Color("#eef2f1"), UiTheme.LINE, 3, 14, 0, Color.TRANSPARENT, 0.0))
+				b.add_child(_key_icon(&"back", UiTheme.INK))
 				b.pressed.connect(_del)
 			"ok":
-				var ic2: CenterContainer = CenterContainer.new()
-				ic2.add_child(HudIcon.new(&"check", 24.0, VisualMaterials.C_OK))
-				b.add_child(ic2)
+				UiTheme.style_button(b, UiTheme.lipped(UiTheme.LEAF_DARK, Color("#1d5426"), 3, 14, 0, Color.TRANSPARENT, 0.0))
+				b.add_child(_key_icon(&"check", Color.WHITE))
 				b.pressed.connect(_submit)
 			_:
+				UiTheme.style_button(b, UiTheme.lipped(UiTheme.PAPER_2, UiTheme.LINE, 3, 14, 0, Color.TRANSPARENT, 0.0))
 				b.text = k
-				b.add_theme_font_size_override("font_size", 20)
+				b.add_theme_font_override("font", UiTheme.display(700))
+				b.add_theme_font_size_override("font_size", 26)
+				for state: String in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
+					b.add_theme_color_override(state, UiTheme.INK)
 				b.pressed.connect(_type.bind(k))
 		grid.add_child(b)
 	return grid
+
+
+static func _key_icon(icon_name: StringName, color: Color) -> CenterContainer:
+	var c: CenterContainer = CenterContainer.new()
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.set_anchors_preset(Control.PRESET_FULL_RECT)
+	c.add_child(HudIcon.new(icon_name, 22.0, color))
+	return c
 
 
 func _on_gui_input(event: InputEvent) -> void:
@@ -219,4 +205,4 @@ func _shake() -> void:
 
 func _paint() -> void:
 	_display.text = _typed if _typed != "" else "?"
-	_display.add_theme_color_override("font_color", Color.WHITE if _typed != "" else Color(1, 1, 1, 0.4))
+	_display.add_theme_color_override("font_color", UiTheme.INK if _typed != "" else Color("#8fa7a1"))

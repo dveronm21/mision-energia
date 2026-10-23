@@ -5,12 +5,15 @@ extends Control
 ## cámara en el resto de la pantalla no interfiere (no hace falta el manejo de pointer
 ## capture de la web). `x`: −1 izquierda … 1 derecha; `y`: −1 arriba (avanzar) … 1 abajo.
 
-const RADIUS: float = 64.0
-const KNOB_RADIUS: float = 26.0
+## `.hud-joy`: 132 px; perilla al 44 % (58 px).
+const RADIUS: float = 66.0
+const KNOB_RADIUS: float = 29.0
 const DEAD_ZONE: float = 0.12
-const COLOR_RING: Color = Color(1.0, 1.0, 1.0, 0.18)
-const COLOR_RING_ACTIVE: Color = Color(1.0, 1.0, 1.0, 0.3)
-const COLOR_KNOB: Color = Color("#ffb82e")
+const COLOR_BASE: Color = Color(14.0 / 255.0, 36.0 / 255.0, 32.0 / 255.0, 0.55)
+const COLOR_RING: Color = Color(1.0, 1.0, 1.0, 0.55)
+const COLOR_RING_ACTIVE: Color = Color(1.0, 1.0, 1.0, 0.9)
+const COLOR_KNOB: Color = Color(1.0, 1.0, 1.0, 0.92)
+const COLOR_KNOB_SHADOW: Color = Color(0.0, 0.0, 0.0, 0.25)
 
 ## Callable(v: Vector2) -> void: se llama cuando cambia el vector (ya con zona muerta aplicada).
 var on_change: Callable
@@ -102,5 +105,8 @@ func _set_vector(v: Vector2) -> void:
 
 func _draw() -> void:
 	var center: Vector2 = size / 2.0
-	draw_circle(center, RADIUS, COLOR_RING_ACTIVE if is_active() else COLOR_RING)
-	draw_circle(center + _knob_offset, KNOB_RADIUS, COLOR_KNOB)
+	draw_circle(center, RADIUS - 1.5, COLOR_BASE, true, -1.0, true)
+	draw_arc(center, RADIUS - 1.5, 0.0, TAU, 64, COLOR_RING_ACTIVE if is_active() else COLOR_RING, 3.0, true)
+	var knob: Vector2 = center + _knob_offset
+	draw_circle(knob + Vector2(0, 4), KNOB_RADIUS, COLOR_KNOB_SHADOW, true, -1.0, true)
+	draw_circle(knob, KNOB_RADIUS, COLOR_KNOB, true, -1.0, true)

@@ -74,6 +74,8 @@ var _flow_violet: EnergyFlowVisual
 var _flow_grid: EnergyFlowVisual
 var _flow_pump: EnergyFlowVisual
 var _disposed: bool = false
+## Visual del técnico (gestos de festejo y de "uy").
+var _rig: WorkerVisual
 
 
 func _init(deps: SessionDeps) -> void:
@@ -98,6 +100,7 @@ func _init(deps: SessionDeps) -> void:
 	var helmet: Color = _d.cosmetics.get("helmet", VisualMaterials.C_SUN)
 	var vest: Color = _d.cosmetics.get("vest", VisualMaterials.C_ORANGE)
 	var rig: WorkerVisual = WorkerVisual.new(helmet, vest)
+	_rig = rig
 	player = Player.new(rig, _world.colliders, _world.floor_at, _world.layout.spawn)
 	_world.add_child(player)
 	_hands = HandsController.new(rig)
@@ -177,6 +180,7 @@ func toast(text: String, kind: StringName = &"info") -> void:
 	_d.ui.show_toast(text, kind, 4600 if kind == &"bad" else 3200)
 	if kind == &"bad":
 		sfx("bad")
+		_rig.play_gesture(&"oops")
 
 
 func sfx(sfx_name: String) -> void:
@@ -205,8 +209,13 @@ func install_panel(m: Mount) -> void:
 	m.install(h.item_faulty)
 	_ensure_row_wire(m.row)
 	sfx("place")
+	WorldFx.dust(_world, m.visual.position)
 	var n: int = _world.panels_installed()
 	var total: int = _purchase.panels
+	if n >= total:
+		WorldFx.glints(_world, m.visual.position + Vector3(0, 1.0, 0))
+		_rig.play_gesture(&"cheer")
+		sfx("star_1")
 	toast("¡Campo solar completo!" if n >= total else "Panel %d de %d instalado." % [n, total], &"good")
 	_changed()
 
@@ -216,6 +225,7 @@ func install_protection() -> void:
 	_world.protection.install()
 	_world.link_protection()
 	sfx("place")
+	WorldFx.sparks(_world, _world.protection.terminal, 18)
 	toast("Protección instalada: corta el circuito si hay una falla.", &"good")
 	_changed()
 
@@ -231,6 +241,7 @@ func install_battery(i: int) -> void:
 	slot.set_charge(_level.start_soc)
 	_world.colliders.add(slot.position.x, slot.position.z, 0.5, 0.32)
 	sfx("place")
+	WorldFx.dust(_world, slot.position)
 	toast("Batería %d instalada: %s kWh para guardar energía." % [_world.batteries_installed(), JsMath.fmt_decimal(_level.battery_kwh)], &"good")
 	_changed()
 
@@ -278,6 +289,10 @@ func connect_cable(to: StringName) -> void:
 	c.connect_cable(h.cable_color, pts)
 	_hands.clear()
 	sfx("ok")
+	sfx("spark")
+	if pts.size() > 0:
+		WorldFx.sparks(_world, pts[pts.size() - 1])
+	_rig.play_gesture(&"thumbs")
 	toast("¡Bien! Conectaste el %s." % CableNetwork.NAMES.get(h.cable_color, "cable"), &"good")
 	_changed()
 
@@ -420,6 +435,9 @@ func _activate() -> void:
 	_d.hud.stats.set_visible(true)
 	_d.hud.stats.update(_snap)
 	sfx("power")
+	WorldFx.glints(_world, w.console.visual.position + Vector3(0, 1.2, 0), 60)
+	cam_rig.punch()
+	_rig.play_gesture(&"cheer")
 	if w.any_faulty():
 		toast("¡Planta activada! Pero una fila marca 0 V en el inversor. Usá el multímetro.", &"bad")
 	else:
@@ -657,6 +675,12 @@ func _finish(s: SimSnapshot) -> void:
 	_d.hud.meter.hide()
 	_d.hud.actions.set_meter_on(false)
 	sfx("win" if s.won else "lose")
+	if s.won:
+		_rig.play_gesture(&"victory", true)
+		cam_rig.celebrate()
+		WorldFx.glints(_world, player.position + Vector3(0, 1.5, 0), 70)
+	else:
+		_rig.play_gesture(&"oops")
 	if not s.won:
 		toast("¡Apagón! La batería se agotó a las %s." % JsMath.fmt_hour(s.hour), &"bad")
 	_changed()
@@ -959,8 +983,18 @@ func shed_loads() -> Array[String]:
 	return _shed.duplicate()
 
 
+## Barrido de cámara de entrada. Llamar una vez que `root` ya está en la escena.
+func start_intro() -> void:
+	cam_rig.intro()
+
+
 func force_interaction_update() -> void:
 	_update_interaction()
+
+
+## Calidad gráfica del ambiente: 0 = baja, 1 = media, 2 = alta (ver `EnvironmentRig.set_quality`).
+func set_quality(q: int) -> void:
+	_env.set_quality(q)
 
 
 func dispose() -> void:

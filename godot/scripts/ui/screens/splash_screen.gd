@@ -6,6 +6,8 @@ extends UiScreen
 var _audio: AudioSynth
 var _on_start: Callable
 var _done: bool = false
+var _tap: Button
+var _breathe: Tween = null
 
 
 ## `on_start`: Callable() -> void. `audio` y `version` opcionales.
@@ -16,45 +18,65 @@ func _init(on_start: Callable, audio: AudioSynth = null, version: String = "") -
 	root = Control.new()
 	root.name = "splash"
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var bg: ColorRect = ColorRect.new()
-	bg.color = Color("#0e2420")
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.add_child(bg)
+	root.add_child(UiBackdrop.new(UiBackdrop.Kind.SPLASH))
 
 	var center: CenterContainer = CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(center)
 
 	var col: VBoxContainer = VBoxContainer.new()
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
-	col.add_theme_constant_override("separation", 22)
+	col.add_theme_constant_override("separation", 18)
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	var logo_center: CenterContainer = CenterContainer.new()
+	logo_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	logo_center.add_child(Logo.build())
 	col.add_child(logo_center)
 
-	var tag: Label = Label.new()
-	tag.text = "Armá tu planta solar y mantené la ciudad encendida día y noche."
+	var tag: Label = UiTheme.label("Armá tu planta solar y mantené la ciudad encendida día y noche.", UiTheme.body(700), 18, UiTheme.MUTED)
 	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tag.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	tag.custom_minimum_size = Vector2(420, 0)
+	tag.custom_minimum_size = Vector2(300, 0)
 	col.add_child(tag)
 
-	var tap: Button = UiCommon.action_button("Tocá para empezar", _go, &"primary", &"play", true)
-	col.add_child(tap)
+	_tap = UiCommon.action_button("Tocá para empezar", _go, &"primary", &"play", true)
+	_tap.custom_minimum_size.y = 60
+	_tap.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	col.add_child(_tap)
 
 	center.add_child(col)
 
-	var foot: Label = Label.new()
-	foot.text = "Inkfusion · San Juan" + (" · v%s" % version if version != "" else "")
-	foot.add_theme_font_size_override("font_size", 12)
-	foot.add_theme_color_override("font_color", Color(1, 1, 1, 0.5))
-	foot.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	foot.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	foot.position.y = -28
+	var foot: Label = UiTheme.label("Inkfusion · San Juan" + (" · v%s" % version if version != "" else ""), UiTheme.body(700), 13, UiTheme.MUTED)
+	foot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	foot.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	foot.offset_top = -32
+	foot.offset_bottom = -10
 	root.add_child(foot)
 
 	root.gui_input.connect(_on_root_input)
+
+
+func on_enter() -> void:
+	UiCommon.focus_later(_tap)
+	_start_breathe.call_deferred()
+
+
+## Respira (`@keyframes breathe`: escala 1.05 a mitad de 1,6 s), sobre su centro. Diferido: recién
+## después del primer acomodo el botón tiene su tamaño real.
+func _start_breathe() -> void:
+	if _breathe == null and _tap.is_inside_tree():
+		_tap.pivot_offset = _tap.size / 2.0
+		_breathe = _tap.create_tween().set_loops()
+		_breathe.tween_property(_tap, "scale", Vector2(1.05, 1.05), 0.8).set_trans(Tween.TRANS_SINE)
+		_breathe.tween_property(_tap, "scale", Vector2.ONE, 0.8).set_trans(Tween.TRANS_SINE)
+
+
+func dispose() -> void:
+	if _breathe != null:
+		_breathe.kill()
+		_breathe = null
 
 
 func _on_root_input(event: InputEvent) -> void:

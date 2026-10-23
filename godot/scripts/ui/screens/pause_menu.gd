@@ -9,6 +9,7 @@ var _deps: PauseDeps
 var _armed: StringName = &""
 var _arm_timer: SceneTreeTimer
 
+var _resume_btn: Button
 var _restart_btn: Button
 var _restart_label: Label
 var _exit_btn: Button
@@ -25,80 +26,49 @@ func _init(deps: PauseDeps) -> void:
 	root = Control.new()
 	root.name = "pause"
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var dim: ColorRect = ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.55)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.add_child(dim)
-
-	var center: CenterContainer = CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.add_child(center)
-
-	var card: PanelContainer = PanelContainer.new()
-	var bg: StyleBoxFlat = StyleBoxFlat.new()
-	bg.bg_color = Color("#13302a")
-	bg.corner_radius_top_left = 20
-	bg.corner_radius_top_right = 20
-	bg.corner_radius_bottom_left = 20
-	bg.corner_radius_bottom_right = 20
-	bg.content_margin_left = 24
-	bg.content_margin_right = 24
-	bg.content_margin_top = 20
-	bg.content_margin_bottom = 20
-	card.add_theme_stylebox_override("panel", bg)
-	card.custom_minimum_size = Vector2(340, 0)
-
-	var col: VBoxContainer = VBoxContainer.new()
-	col.add_theme_constant_override("separation", 14)
+	# `.mdl-card.pm`: tarjeta blanca de 480 px.
+	var col: VBoxContainer = UiCommon.modal_card(root, 480.0, 22.0, 12)
 
 	var head: HBoxContainer = HBoxContainer.new()
-	head.add_theme_constant_override("separation", 10)
-	head.add_child(HudIcon.new(&"pause", 26.0, VisualMaterials.C_SUN))
+	head.add_theme_constant_override("separation", 12)
+	var ic: PanelContainer = PanelContainer.new()
+	ic.custom_minimum_size = Vector2(48, 48)
+	ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	ic.add_theme_stylebox_override("panel", UiTheme.box(UiTheme.PAPER_2, 999))
+	var ic_c: CenterContainer = CenterContainer.new()
+	ic_c.add_child(HudIcon.new(&"pause", 24.0, UiTheme.INK))
+	ic.add_child(ic_c)
+	head.add_child(ic)
 	var head_titles: VBoxContainer = VBoxContainer.new()
+	head_titles.add_theme_constant_override("separation", 0)
 	if deps.level_name != "":
-		var eb: Label = Label.new()
-		eb.text = deps.level_name
-		eb.add_theme_font_size_override("font_size", 12)
-		eb.add_theme_color_override("font_color", Color(1, 1, 1, 0.6))
-		head_titles.add_child(eb)
-	var title: Label = Label.new()
-	title.text = "Pausa"
-	title.add_theme_font_size_override("font_size", 22)
-	head_titles.add_child(title)
+		head_titles.add_child(UiTheme.eyebrow(deps.level_name, UiTheme.SUN_INK))
+	head_titles.add_child(UiTheme.title("Pausa", 30, UiTheme.INK))
 	head.add_child(head_titles)
 	col.add_child(head)
 
-	col.add_child(UiCommon.action_button("Seguir jugando", deps.on_resume, &"primary", &"play", true))
+	_resume_btn = UiCommon.action_button("Seguir jugando", deps.on_resume, &"primary", &"play", true)
+	col.add_child(_resume_btn)
 
 	var grid: HBoxContainer = HBoxContainer.new()
 	grid.add_theme_constant_override("separation", 10)
 	_restart_btn = UiCommon.action_button("Reiniciar nivel", _arm_restart, &"secondary", &"retry")
+	_restart_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_restart_label = _find_label(_restart_btn)
 	grid.add_child(_restart_btn)
 	_exit_btn = UiCommon.action_button("Salir al mapa", _arm_exit, &"secondary", &"map")
+	_exit_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_exit_label = _find_label(_exit_btn)
 	grid.add_child(_exit_btn)
 	col.add_child(grid)
 
 	if deps.audio != null:
-		_sound_btn = Button.new()
-		# Ancho mínimo fijo (Button no calcula tamaño a partir de hijos Control agregados a mano).
-		_sound_btn.custom_minimum_size = Vector2(220, 44)
-		var row: HBoxContainer = HBoxContainer.new()
-		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		row.add_theme_constant_override("separation", 8)
-		_sound_icon = HudIcon.new(&"sound", 22.0)
-		row.add_child(_sound_icon)
-		_sound_label = Label.new()
-		row.add_child(_sound_label)
-		_sound_btn.add_child(row)
-		_sound_btn.pressed.connect(_toggle_sound)
+		# `.pm-sound`: botón de contorno oscuro a todo el ancho.
+		_sound_btn = UiCommon.action_button("Sonido: prendido", _toggle_sound, &"ghost_ink", &"sound")
+		_sound_icon = _find_icon(_sound_btn)
+		_sound_label = _find_label(_sound_btn)
 		col.add_child(_sound_btn)
 		_paint_sound()
-
-	card.add_child(col)
-	center.add_child(card)
 
 
 func on_back() -> bool:
@@ -163,3 +133,15 @@ static func _find_label(button: Button) -> Label:
 			if g is Label:
 				return g
 	return null
+
+
+static func _find_icon(button: Button) -> HudIcon:
+	for c: Node in button.get_children():
+		for g: Node in c.get_children():
+			if g is HudIcon:
+				return g
+	return null
+
+
+func on_enter() -> void:
+	UiCommon.focus_later(_resume_btn)
