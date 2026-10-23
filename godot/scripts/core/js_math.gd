@@ -27,6 +27,18 @@ static func fmt_decimal(n: float) -> String:
 	return "%s%d,%d" % [sign_txt, whole, frac]
 
 
+## Hora de juego (10.5, o 30 = 06:00 del día siguiente) a reloj "HH:MM" (equivale a `fmtHour`
+## de `ui/format.ts`): `10.5` → "10:30"; `30` → "06:00".
+static func fmt_hour(hour: float) -> String:
+	var h: float = fposmod(hour, 24.0)
+	var hh: int = int(floor(h))
+	var mm: int = js_round((h - hh) * 60.0)
+	if mm == 60:
+		mm = 0
+		hh = (hh + 1) % 24
+	return "%02d:%02d" % [hh, mm]
+
+
 ## Número en base 36 (como `n.toString(36)` de JS) para ids de órdenes.
 static func to_base36(n: int) -> String:
 	if n == 0:

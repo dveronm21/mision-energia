@@ -15,6 +15,7 @@ const C_BAD := Color("#ff4d4d")
 
 static var _glow: StandardMaterial3D
 static var _blob: StandardMaterial3D
+static var _ghost: StandardMaterial3D
 static var _lamp_shared: Array[BaseMaterial3D] = []
 static var _night := 0.0
 
@@ -44,6 +45,18 @@ static func blob_shadow() -> StandardMaterial3D:
 		_blob.disable_receive_shadows = true
 		_blob.render_priority = -1
 	return _blob
+
+
+## Silueta translúcida de lo que falta instalar (protección, batería: todavía sin modelo).
+static func ghost() -> StandardMaterial3D:
+	if _ghost == null:
+		_ghost = StandardMaterial3D.new()
+		_ghost.resource_name = "ghost"
+		_ghost.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_ghost.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_ghost.albedo_color = Color(C_SUN.r, C_SUN.g, C_SUN.b, 0.28)
+		_ghost.disable_receive_shadows = true
+	return _ghost
 
 
 ## Material de superficie lisa de un color (cables, piezas sueltas).
