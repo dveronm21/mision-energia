@@ -54,6 +54,6 @@ npm run build                       # genera app/dist
 KS=/ruta/keystore.jks KS_PASS=... ../android/build.sh
 ```
 
-**Publicar una versión:** subí `versionCode` y `versionName` en `android/AndroidManifest.xml` y `version` en `app/package.json`, y creá el tag `vX.Y.Z`. GitHub Actions compila, firma y publica el APK en Releases. Usa los secretos `KEYSTORE_B64` y `KS_PASS`. El enlace del QR siempre baja la última versión.
+**Publicar una versión (1.0, Godot):** creá el tag `vX.Y.Z` (por ejemplo `git tag v1.0.0 && git push origin v1.0.0`). GitHub Actions corre los tests, toma la versión del tag (versionCode `X·10000 + Y·100 + Z`), exporta y firma `MisionEnergia.apk` (celular), `MisionEnergiaTV.apk` (tele) y `MisionEnergiaControl.apk` (tablets), y los publica en Releases con `docs/RELEASE_NOTES.md`. Usa los secretos `KEYSTORE_B64` y `KS_PASS` (alias `misionenergia`). El enlace del QR siempre baja la última versión **final** del celular, y la 1.0 se instala encima de la 0.3 porque tiene el mismo paquete y la misma firma. Para probar antes de publicar, usá un tag con sufijo (`v1.0.0-rc1`): sale como pre-release, se descarga desde Releases y el QR no cambia.
 
 Hecho por Inkfusion · San Juan, Argentina.

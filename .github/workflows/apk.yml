@@ -1,5 +1,12 @@
 name: Compilar y publicar APK
 
+# Versión 1.0 (Godot): con cada tag vX.Y.Z se prueban y exportan
+#   MisionEnergia.apk         juego en el celular (mismo paquete que la 0.3: se instala encima)
+#   MisionEnergiaTV.apk       juego en el tele, modo cooperativo con tablets
+#   MisionEnergiaControl.apk  app de las tablets de feria (Java, sin cambios)
+# y se publican en Releases. El QR (.../releases/latest/download/MisionEnergia.apk) no cambia.
+# Secretos: KEYSTORE_B64 (keystore en base64) y KS_PASS. Las tres APK llevan la misma firma.
+
 on:
   push:
     tags: ['v*']
@@ -8,45 +15,127 @@ on:
 permissions:
   contents: write
 
+env:
+  GODOT_VERSION: 4.7.2
+  GODOT_ZIP: Godot_v4.7.2-stable_linux.x86_64.zip
+  GODOT_ZIP_SHA512: 9aa00f7a605200940bce3027a567b782f49bd8e940dd06ae9e987bd65aee1b1467edd56ed84fcdcbdd44354bf613bdbb4e5d2913e925850368e150c59ed54c65
+  TEMPLATES_TPZ: Godot_v4.7.2-stable_export_templates.tpz
+  TEMPLATES_SHA512: ca4d71c4d7b81dfc15d1a98baa07534aa95b03fdda78a0075b06672e1648d2e5f40980c9adc28d23e1b92e732ee7bf3461997aa804af74ec2fcd7a93ccb84079
+  KS_ALIAS: misionenergia
+
 jobs:
   apk:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-java@v4
         with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: app/package-lock.json
+          distribution: temurin
+          java-version: 17
 
-      - name: Herramientas Android (paquetes de Ubuntu)
+      - name: Godot y plantillas en caché
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ~/godot-dl
+          key: godot-${{ env.GODOT_VERSION }}-${{ env.TEMPLATES_SHA512 }}
+
+      - name: Descargar Godot ${{ env.GODOT_VERSION }} (verificando SHA-512)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot-dl && cd ~/godot-dl
+          BASE="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          curl -fsSL -o "$GODOT_ZIP" "$BASE/$GODOT_ZIP"
+          curl -fsSL -o "$TEMPLATES_TPZ" "$BASE/$TEMPLATES_TPZ"
+          echo "$GODOT_ZIP_SHA512  $GODOT_ZIP" | sha512sum -c -
+          echo "$TEMPLATES_SHA512  $TEMPLATES_TPZ" | sha512sum -c -
+
+      - name: Instalar Godot y plantillas de Android
+        run: |
+          cd ~/godot-dl
+          unzip -q -o "$GODOT_ZIP" -d bin
+          sudo install -m 755 bin/Godot_v${GODOT_VERSION}-stable_linux.x86_64 /usr/local/bin/godot
+          T=~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          mkdir -p "$T"
+          unzip -q -o -j "$TEMPLATES_TPZ" 'templates/android_*' 'templates/version.txt' -d "$T"
+          ls -la "$T"
+          godot --version
+
+      - name: Importar y probar (dominio, balance, red)
+        working-directory: godot
+        run: |
+          godot --headless --path . --import
+          godot --headless --path . -s res://tests/run_tests.gd
+          godot --headless --path . -s res://tests/balance.gd
+          godot --headless --path . -s res://tests/remote/run_remote_tests.gd
+
+      - name: Versión desde el tag
+        run: |
+          # vX.Y.Z → versión final; vX.Y.Z-rc1 (o cualquier sufijo) → prueba, con un código uno
+          # menor para que la final se instale encima de la de prueba.
+          if [[ "${GITHUB_REF_NAME}" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-[0-9A-Za-z.]+)?$ ]]; then
+            NAME="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}${BASH_REMATCH[4]}"
+            CODE=$(( BASH_REMATCH[1] * 10000 + BASH_REMATCH[2] * 100 + BASH_REMATCH[3] ))
+            [ -n "${BASH_REMATCH[4]}" ] && CODE=$(( CODE - 1 ))
+          else
+            NAME=$(grep -o 'config/version="[^"]*"' godot/project.godot | cut -d'"' -f2)
+            CODE=$(grep -o 'version/code=[0-9]*' godot/export_presets.cfg | head -1 | cut -d= -f2)
+          fi
+          # La 0.3 tenía versionCode 3: cualquier 1.x es mayor y se instala encima.
+          sed -i "s/^version\/code=.*/version\/code=${CODE}/; s/^version\/name=.*/version\/name=\"${NAME}\"/" godot/export_presets.cfg
+          sed -i "s/^config\/version=.*/config\/version=\"${NAME}\"/" godot/project.godot
+          echo "Versión ${NAME} (código ${CODE})"
+
+      - name: Keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "GODOT_ANDROID_KEYSTORE_RELEASE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          echo "GODOT_ANDROID_KEYSTORE_RELEASE_USER=$KS_ALIAS" >> "$GITHUB_ENV"
+
+      - name: Exportar MisionEnergia.apk (teléfono)
+        working-directory: godot
+        env:
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ secrets.KS_PASS }}
+        run: |
+          mkdir -p build
+          godot --headless --path . --export-release "Android Teléfono" build/MisionEnergia.apk
+          test -s build/MisionEnergia.apk
+
+      - name: Exportar MisionEnergiaTV.apk (tele, con Gradle)
+        env:
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ secrets.KS_PASS }}
+        run: |
+          ./android/godot/prepare-tv-template.sh ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_source.zip
+          cd godot
+          godot --headless --path . --export-release "Android TV" build/MisionEnergiaTV.apk
+          test -s build/MisionEnergiaTV.apk
+
+      - name: Compilar MisionEnergiaControl.apk (tablets, Java)
+        env:
+          KS_PASS: ${{ secrets.KS_PASS }}
         run: |
           sudo apt-get update -q
           sudo apt-get install -y -q aapt apksigner zipalign dalvik-exchange android-sdk-platform-23
+          KS="$RUNNER_TEMP/release.jks" ./android/build-variant.sh control
 
-      - name: Juego (tipos, tests, balance, build)
-        working-directory: app
+      - name: Verificar firmas y juntar las APK
         run: |
-          npm ci
-          npm run typecheck
-          npm test
-          npm run balance
-          npm run build
-
-      - name: Firmar y empaquetar APK
-        env:
-          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
-          KS_PASS: ${{ secrets.KS_PASS }}
-        run: |
-          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
-          KS="$RUNNER_TEMP/release.jks" ./android/build.sh
+          mkdir -p dist
+          cp godot/build/MisionEnergia.apk godot/build/MisionEnergiaTV.apk android/build/MisionEnergiaControl.apk dist/
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          for f in dist/*.apk; do
+            "$BT/apksigner" verify --print-certs "$f" | grep -m1 "SHA-256"
+            aapt dump badging "$f" | grep -E "^package:"
+          done
           rm -f "$RUNNER_TEMP/release.jks"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: MisionEnergia-apk
-          path: android/build/MisionEnergia.apk
+          name: MisionEnergia-apks
+          path: dist/*.apk
 
       - name: Publicar en Releases
         if: startsWith(github.ref, 'refs/tags/v')
@@ -54,9 +143,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${GITHUB_REF_NAME}"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" android/build/MisionEnergia.apk --clobber
+          # Solo una versión final (vX.Y.Z) pasa a ser "latest", que es lo que baja el QR.
+          # Un tag con sufijo (vX.Y.Z-rc1) sale como pre-release: se descarga desde Releases
+          # para probar, sin cambiar lo que baja el QR.
+          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            KIND=(--latest)
           else
-            gh release create "$TAG" android/build/MisionEnergia.apk \
-              --title "Misión Energía ${TAG#v}" --notes-file docs/RELEASE_NOTES.md --latest
+            KIND=(--prerelease --latest=false)
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.apk --clobber
+          else
+            gh release create "$TAG" dist/*.apk "${KIND[@]}" \
+              --title "Misión Energía ${TAG#v}" --notes-file docs/RELEASE_NOTES.md
           fi

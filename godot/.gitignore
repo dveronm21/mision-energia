@@ -1,1 +1,4 @@
 .godot/
+build/
+# Plantilla de build de Android (la instala y ajusta el CI: android/godot-tv-banner.sh)
+android/
