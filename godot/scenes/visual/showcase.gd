@@ -129,7 +129,7 @@ func _build_room(g: float) -> Dictionary:
 	_add(ModelLibrary.instantiate(&"canopy"), Vector3(7, 0.16, -6.1))
 	var inv := InverterVisual.new()
 	_add(inv, Vector3(5.2, 0.16, -6.9))
-	inv.set_screen("4,8 kW" if g > 0.5 else "STANDBY", Color("#5fe3f5") if g > 0.5 else Color("#8fa7a1"))
+	inv.set_screen("SOLAR ON" if g > 0.5 else "STANDBY", Color("#5fe3f5") if g > 0.5 else Color("#8fa7a1"))
 	var prot := ProtectionVisual.new()
 	_add(prot, Vector3(3.3, 0.16, -6.9))
 	var sw := SwitchboardVisual.new()

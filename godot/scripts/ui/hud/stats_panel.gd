@@ -68,7 +68,23 @@ func _init() -> void:
 
 
 static func _value() -> Label:
-	return UiTheme.label("0,0 kW", UiTheme.display(600), 17)
+	return UiTheme.label("Nada", UiTheme.display(600), 17)
+
+
+## Sin valores eléctricos en pantalla: la generación se muestra por nivel de sol.
+static func gen_level(s: SimSnapshot) -> String:
+	if s.gen_kw <= 0.01:
+		return "Nada"
+	if s.irradiance >= 0.6:
+		return "Alta"
+	return "Media" if s.irradiance >= 0.3 else "Baja"
+
+
+## De dónde sale la energía que se consume ahora.
+static func load_source(s: SimSnapshot) -> String:
+	if s.blackout:
+		return "Sin luz"
+	return "Del sol" if s.net_kw >= 0.0 else "De batería"
 
 
 func _row(ic: StringName, label_text: String, value: Label) -> Control:
@@ -97,8 +113,8 @@ func update(s: SimSnapshot) -> void:
 	_clock.text = JsMath.fmt_hour(s.hour)
 	_phase.text = ("Apagón" if s.blackout else ("Noche" if s.is_night else ("Nublado" if s.irradiance < 0.35 else "Día"))).to_upper()
 	_phase.add_theme_color_override("font_color", PHASE_BLACKOUT if s.blackout else (PHASE_NIGHT if s.is_night else UiTheme.MUTED))
-	_gen.text = UiFormat.fmt_kw(s.gen_kw)
-	_load.text = UiFormat.fmt_kw(s.load_kw)
+	_gen.text = gen_level(s)
+	_load.text = load_source(s)
 	_bat.text = UiFormat.fmt_pct(s.soc_pct)
 	_bar_fill.anchor_right = clampf(s.soc_pct, 0.0, 1.0)
 	_fill_style.bg_color = UiTheme.WARN if s.soc_pct < 0.2 else UiTheme.LEAF

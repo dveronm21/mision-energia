@@ -43,10 +43,10 @@ func _init() -> void:
 	screen.add_theme_stylebox_override("panel", _screen_bg)
 	var screen_col: VBoxContainer = VBoxContainer.new()
 	screen_col.add_theme_constant_override("separation", 4)
-	_value = UiTheme.label("--- V", UiTheme.mono(), 38, LCD_INK)
+	_value = UiTheme.label("---", UiTheme.mono(), 38, LCD_INK)
 	_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	screen_col.add_child(_value)
-	_unit = UiTheme.label("V⎓ CC", UiTheme.mono(), 14, LCD_INK)
+	_unit = UiTheme.label("multímetro", UiTheme.mono(), 14, LCD_INK)
 	_unit.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	screen_col.add_child(_unit)
 	screen.add_child(screen_col)
@@ -70,10 +70,12 @@ func hide() -> void:
 	visible_now = false
 
 
-## `value`: "38,4 V" o "--- V"; `unit`: "V⎓ CC"; `note`: explicación breve. `state`: "idle"|"ok"|"bad".
+## `value`: "OK", "FALLA" o "---"; `unit`: "por fila"; `note`: explicación breve. `state`: "idle"|"ok"|"bad".
 func set_reading(value: String, unit: String, note: String, state: StringName = &"idle") -> void:
 	var changed: bool = _value.text != value
 	_value.text = value
+	# Con 3 o 4 filas ("F1 OK  F2 FALLA  F3 OK…") la lectura se achica para entrar en el display.
+	_value.add_theme_font_size_override("font_size", 38 if value.length() <= 14 else (28 if value.length() <= 22 else 22))
 	_unit.text = unit
 	_note.text = note
 	match state:
@@ -84,6 +86,6 @@ func set_reading(value: String, unit: String, note: String, state: StringName = 
 		_:
 			_screen_bg.bg_color = LCD_IDLE
 	# La lectura nueva "parpadea" como un display real al estabilizarse.
-	if changed and value != "--- V" and _value.is_inside_tree():
+	if changed and value != "---" and _value.is_inside_tree():
 		_value.modulate.a = 0.25
 		_value.create_tween().tween_property(_value, "modulate:a", 1.0, 0.18)

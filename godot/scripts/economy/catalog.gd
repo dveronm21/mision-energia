@@ -31,7 +31,7 @@ static func default_products() -> Array[Product]:
 
 		Product.priced("boost_hint", Product.KIND_BOOSTER, "Pista", "Resalta el próximo paso de la obra.", 10, true, "hint"),
 		Product.priced("boost_drone", Product.KIND_BOOSTER, "Dron limpiador", "Después del Zonda, limpia el polvo de todas las filas.", 25, true, "drone"),
-		Product.priced("boost_battery", Product.KIND_BOOSTER, "Batería de emergencia", "Suma 4 kWh ya cargados, una sola vez.", 35, true, "battery-plus"),
+		Product.priced("boost_battery", Product.KIND_BOOSTER, "Batería de emergencia", "Suma una carga extra de batería, una sola vez.", 35, true, "battery-plus"),
 		Product.priced("boost_budget", Product.KIND_BOOSTER, "Presupuesto extra", "+15% de créditos de obra en un nivel.", 40, true, "coins"),
 
 		Product.priced("skin_helmet_blue", Product.KIND_COSMETIC, "Casco azul", "Casco de técnico color azul.", 60, false, "helmet"),

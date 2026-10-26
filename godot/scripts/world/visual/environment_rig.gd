@@ -15,6 +15,9 @@ extends Node3D
 ##   building.set_lights(env.night_factor())
 
 const SKY_SHADER := preload("res://scripts/world/visual/shaders/sky.gdshader")
+const TERRAIN_SHADER := preload("res://scripts/world/visual/shaders/terrain_stylized.gdshader")
+## Texturas pintadas a mano del terreno (ver tools/stylized_textures).
+const STYLIZED_DIR := "res://assets/textures/stylized/"
 const INSTANCES_PATH := "res://assets/models/env_instances.json"
 ## Mallas de vegetación instanciada (nombre en env_instances.json → modelo env_<nombre>.glb).
 const SCATTER: Array[StringName] = [&"rocks", &"jarillas", &"grass", &"algarrobos", &"alamos", &"vinedo"]
@@ -71,6 +74,7 @@ func _init() -> void:
 	terrain = ModelLibrary.instantiate(&"env_terrain")
 	add_child(terrain)
 	_set_shadow_cast(terrain, false) # la zona de juego es plana: sólo recibe
+	_stylize_terrain()
 	mountains = ModelLibrary.instantiate(&"env_mountains")
 	add_child(mountains)
 	_set_shadow_cast(mountains, false)
@@ -365,6 +369,18 @@ func _build_dust() -> void:
 	dust.emitting = false
 	dust.visible = false
 	add_child(dust)
+
+
+## Cambia el material del terreno por el estilizado (médanos + manchas de barreal agrietado).
+func _stylize_terrain() -> void:
+	var mi: MeshInstance3D = ModelLibrary.find_mesh(terrain)
+	if mi == null:
+		return
+	var m: ShaderMaterial = ShaderMaterial.new()
+	m.shader = TERRAIN_SHADER
+	m.set_shader_parameter("sand_tex", load(STYLIZED_DIR + "sand_detail.png"))
+	m.set_shader_parameter("cracks_tex", load(STYLIZED_DIR + "cracks_detail.png"))
+	mi.material_override = m
 
 
 func _set_shadow_cast(n: Node, on: bool) -> void:

@@ -25,6 +25,8 @@ func _init(p_kind: StringName, pos: Vector3, p_faulty: bool, colliders: Collider
 		_box = colliders.add(pos.x, pos.z, 0.2, 0.2)
 	else:
 		add_child(CrateVisual.new(kind))
+		# Aura del color del equipo: qué cajón llevar (y su destino tiene la misma).
+		add_child(AuraVisual.new(AuraVisual.COLOR_KIT if kind == &"kit" else (AuraVisual.COLOR_BATTERY if kind == &"battery" else AuraVisual.COLOR_PROTECTION)))
 		_box = colliders.add(pos.x, pos.z, 0.45, 0.45)
 	position = pos
 	rotation.y = yaw

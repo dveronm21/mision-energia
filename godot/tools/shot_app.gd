@@ -57,7 +57,7 @@ func _run() -> void:
 	await _shot("04_taller", 40)
 
 	_app.start_level(LevelRun.make("casa", Purchase.make(4, 1, false), [] as Array[StringName]))
-	await _shot("05_partida", 30)
+	await _shot("05_partida", 200)
 
 	_app.pause()
 	await _shot("06_pausa")
@@ -91,10 +91,10 @@ func _run() -> void:
 	var hud: Hud = _app.hud
 	hud.alert.show("¡Alerta de viento Zonda!", "Defendé los paneles: tocá los postes de cada fila.", 4.0)
 	hud.meter.show()
-	hud.meter.set_reading("38,4 V", "V⎓ CC", "Fila 1: tensión correcta.", &"ok")
+	hud.meter.set_reading("F1 OK  F2 OK", "por fila", "Todas las filas generan bien.", &"ok")
 	await _shot("07b_paneles_hud", 30)
 	hud.meter.hide()
-	hud.inspect.show({"title": "Inversor híbrido", "body": "Convierte la corriente continua de los paneles y baterías en alterna para la casa.", "live": "Entregando 0,5 kW a la casa."})
+	hud.inspect.show({"title": "Inversor híbrido", "body": "Convierte la corriente continua de los paneles y baterías en alterna para la casa.", "live": "Entregando energía a la casa."})
 	await _shot("07c_ficha", 30)
 	hud.inspect.hide()
 	hud.alert.hide()

@@ -19,14 +19,6 @@ static func fmt_int(n: float) -> String:
 	return ("-" if neg else "") + out
 
 
-static func fmt_kw(n: float) -> String:
-	return "%s kW" % JsMath.fmt_decimal(maxf(0.0, n))
-
-
-static func fmt_kwh(n: float) -> String:
-	return "%s kWh" % JsMath.fmt_decimal(maxf(0.0, n))
-
-
 ## `p` en 0..1 → "0".."100%".
 static func fmt_pct(p: float) -> String:
 	return "%d%%" % roundi(clampf(p, 0.0, 1.0) * 100.0)

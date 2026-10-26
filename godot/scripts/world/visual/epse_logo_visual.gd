@@ -77,6 +77,28 @@ func _init(height: float = 1.6) -> void:
 		add_child(leg)
 
 
+## Logo pegado en el piso como un vinilo (mismo PNG oficial), acostado y legible desde la
+## cámara (la parte de arriba del logo apunta a −z). `width` en metros; el origen es el centro.
+static func floor_decal(width: float) -> MeshInstance3D:
+	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(OUTLINE))
+	var aspect: float = float(data.get("aspect", 3.0))
+	var m: StandardMaterial3D = StandardMaterial3D.new()
+	m.albedo_texture = load(TEXTURE) as Texture2D
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+	m.alpha_scissor_threshold = 0.5
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	m.roughness = 0.45
+	var q: QuadMesh = QuadMesh.new()
+	q.size = Vector2(width, width / aspect)
+	q.orientation = PlaneMesh.FACE_Y
+	var decal: MeshInstance3D = MeshInstance3D.new()
+	decal.name = "epse_vinilo"
+	decal.mesh = q
+	decal.material_override = m
+	decal.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return decal
+
+
 ## Paredes de la extrusión: cada contorno (x, y en unidades de alto) se levanta entre el dorso y
 ## el frente. Los contornos vienen orientados para que la normal sea (dy, -dx).
 static func _edges_mesh(loops: Array, height: float) -> ArrayMesh:

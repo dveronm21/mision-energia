@@ -4,7 +4,7 @@ extends LoadSheddingPanelPort
 ## alcance. Recibe los `LoadBlock` del nivel (filtra las esenciales) y avisa cada cambio con
 ## `on_toggle(label, encendida)`. Equivale a `LoadSheddingPanel.ts` y `.hud-shed` de
 ## styles.ts: panel oscuro, grilla de 2 columnas de interruptores verdes (grises y tachados
-## cuando están apagados) y el ahorro en kW en verde claro.
+## cuando están apagados) y el ahorro en verde claro.
 
 const SAVING: Color = Color("#9ee6a8")
 const ON_BG: Color = Color("#173a2c")
@@ -124,7 +124,7 @@ func _build_switch(item: LoadShedItem) -> Button:
 
 func _paint(item: LoadShedItem, b: Button, knob: Control, name_label: Label) -> void:
 	UiTheme.style_button(b, UiTheme.box(ON_BG if item.on else UiTheme.HUD_2, 14, 2, UiTheme.LEAF if item.on else OFF_LINE))
-	item.state_label.text = "%s kW · %s" % [JsMath.fmt_decimal(item.kw), "prendido" if item.on else "apagado"]
+	item.state_label.text = "Consumo %s · %s" % [_level_word(item.kw), "prendido" if item.on else "apagado"]
 	name_label.add_theme_color_override("font_color", UiTheme.FG if item.on else UiTheme.MUTED)
 	knob.queue_redraw()
 
@@ -134,7 +134,17 @@ func _update_saving() -> void:
 	for it: LoadShedItem in _items:
 		if not it.on:
 			kw += it.kw
-	_saving.text = ("Ahorrás %s kW" % JsMath.fmt_decimal(kw)) if kw > 0.0 else ""
+	_saving.text = "Ahorrás batería" if kw > 0.0 else ""
+
+
+## Consumo relativo a la carga más grande del panel (sin valores eléctricos en pantalla).
+func _level_word(kw: float) -> String:
+	var top: float = 0.0
+	for it: LoadShedItem in _items:
+		top = maxf(top, it.kw)
+	if top <= 0.0 or kw >= top * 0.66:
+		return "alto"
+	return "medio" if kw >= top * 0.33 else "bajo"
 
 
 func show() -> void:

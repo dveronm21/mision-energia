@@ -4,7 +4,8 @@ extends RefCounted
 ## (equivale a `LevelLayout.ts`). Área compacta (≈ 36 × 22 m):
 ##   oeste: campo solar (filas en +Z → −Z) con postes de fila y caja de conexión;
 ##   centro-norte: sala de equipos (platea + pared + alero) con consola al frente;
-##   sur: pallet de paneles y punto de partida; este: depósito de cajones; noreste: ciudad.
+##   sur: pallet de paneles y punto de partida; delante de la sala: depósito de cajones;
+##   noreste: ciudad.
 ## La cámara arranca al sur (+Z) mirando hacia −Z.
 ##
 ## Lógica pura (sin nodos): se arma con `LevelLayout.build(level, purchase)` y se puede
@@ -14,6 +15,10 @@ const MOUNT_DX: float = 2.25
 const ROW_DZ: float = 3.3
 const ROW0_Z: float = -3.4
 const FIELD_RIGHT_X: float = -4.6
+## Depósito de cajones: justo delante de la sala de equipos (cerca de donde se instalan).
+const DEPOT_X: float = 4.3
+const DEPOT_DX: float = 1.4
+const DEPOT_Z: float = 1.3
 
 var rows: Array[RowLayout] = []
 var field_label: Vector3
@@ -53,7 +58,7 @@ static func build(level: LevelDefinition, purchase: Purchase) -> LevelLayout:
 	if purchase.kit_zonda:
 		kinds.append(&"kit")
 	for i: int in kinds.size():
-		crates.append(CrateSpot.new(kinds[i], Vector3(13.2 + i * 1.3, 0.0, 1.4)))
+		crates.append(CrateSpot.new(kinds[i], Vector3(DEPOT_X + i * DEPOT_DX, 0.0, DEPOT_Z)))
 
 	var layout: LevelLayout = LevelLayout.new()
 	layout.rows = rows
@@ -76,7 +81,7 @@ static func build(level: LevelDefinition, purchase: Purchase) -> LevelLayout:
 	layout.pump = Vector3(15.2, 0.0, -5.2) if level.has_pump else null
 	layout.pallet = Vector3(-4.0, 0.0, 3.2)
 	layout.crates = crates
-	layout.depot_label = Vector3(13.2 + (kinds.size() - 1) * 0.65, 1.55, 1.4)
+	layout.depot_label = Vector3(DEPOT_X + (kinds.size() - 1) * DEPOT_DX / 2.0, 1.55, DEPOT_Z)
 	layout.city = _city_layout(level.id)
 	layout.spawn = Vector3(0.0, 0.0, 2.6)
 	layout.bounds = LevelBounds.new(left_x - 4.6, 21.0, minf(-8.6, last_z - 2.6), 7.5)

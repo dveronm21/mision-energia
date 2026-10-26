@@ -38,7 +38,7 @@ func test_layout_casa_depot_y_limites() -> void:
 	check_eq(l.crates.size(), 2, "cajones: protección + 1 batería")
 	check_eq(l.crates[0].kind, &"protection", "primer cajón es protección")
 	check_eq(l.crates[1].kind, &"battery", "segundo cajón es batería")
-	check_near(l.depot_label.x, 13.85, TOL, "cartel del depósito")
+	check_near(l.depot_label.x, 5.0, TOL, "cartel del depósito")
 
 	check_near(l.bounds.min_x, -15.95, TOL, "límite oeste")
 	check_near(l.bounds.max_x, 21.0, TOL, "límite este")

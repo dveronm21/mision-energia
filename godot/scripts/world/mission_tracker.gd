@@ -37,7 +37,7 @@ func _items() -> Array[MissionItem]:
 		if c.fixed:
 			text = "Reparaste el conector flojo"
 		elif c.row_found:
-			text = "Medí panel por panel la fila que marca 0 V y reconectá"
+			text = "Medí panel por panel la fila que falla y reconectá"
 		else:
 			text = "Medí las filas con el multímetro en la caja de conexión"
 		items.append(MissionItem.new(&"connector", text, c.fixed, c.row_found and not c.fixed))

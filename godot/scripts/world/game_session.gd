@@ -21,6 +21,8 @@ const FLOW_DC: Color = Color("#ffd27a")
 const FLOW_BAT: Color = Color("#7fb3ff")
 const FLOW_AC: Color = Color("#d6c2ff")
 const FLOW_GRID: Color = Color("#fff3a0")
+## Distancia al equipo de donde sale un cable para que se conecte solo.
+const AUTO_WIRE_RADIUS: float = 1.5
 
 ## Raíz para agregar a la escena: ambiente, mundo (con el jugador adentro), resaltados y cámara.
 var root: Node3D
@@ -48,6 +50,8 @@ var _interaction: InteractionSystem
 var _tracker: MissionTracker
 var _highlights: Highlights
 var _env: EnvironmentRig
+## Baja sola la calidad si el equipo no llega a los FPS (null hasta el primer `set_quality`).
+var _auto_q: AutoQuality
 var _snap: SimSnapshot = null
 var _hour: float = 0.0
 var _zonda_fx: float = 0.0
@@ -66,6 +70,8 @@ var _current_inspect: InspectEntry = null
 var _open_inspect_id: String = ""
 var _last_prompt: String = ""
 var _hint_on: bool = false
+## "color:técnico" que ya recibió el aviso de que falta un equipo para ese cable.
+var _auto_wire_near: Dictionary[String, bool] = {}
 var _drone_on: bool = false
 var _bonus_kwh: float = 0.0
 var _row_flows: Array[Variant] = []
@@ -140,6 +146,7 @@ func _init(deps: SessionDeps) -> void:
 	_refresh_booster_bar()
 	_sync_hud()
 	_env.update(0.0, _hour, 0.0, _weather_schedule.cloudiness_at(_hour), player.position)
+	_warm_shaders()
 	toast("Empezá por el pallet de paneles. Ojo: uno puede venir con el conector flojo."
 		if _level.events.loose_connector
 		else "Empezá por el pallet de paneles: está cerca tuyo, a la izquierda.")
@@ -253,7 +260,7 @@ func install_battery(i: int) -> void:
 	_world.colliders.add(slot.position.x, slot.position.z, 0.5, 0.32)
 	sfx("place")
 	WorldFx.dust(_world, slot.position)
-	toast("Batería %d instalada: %s kWh para guardar energía." % [_world.batteries_installed(), JsMath.fmt_decimal(_level.battery_kwh)], &"good")
+	toast("Batería %d instalada: guarda energía para la noche." % _world.batteries_installed(), &"good")
 	_changed()
 
 
@@ -287,17 +294,8 @@ func connect_cable(to: StringName) -> void:
 	if expected != to:
 		toast(_cable_hint(h.cable_color, to), &"bad")
 		return
-	var w: PlantWorld = _world
-	var c: CableNetwork = w.cables
-	var room: RoomLayout = w.layout.room
-	var pts: PackedVector3Array
-	if h.cable_color == CableNetwork.COLOR_ORANGE:
-		pts = CableNetwork.ground_route(w.junction.terminal, w.protection.terminal, w.floor_at, w.layout.junction.z + 0.45, NAN)
-	elif h.cable_color == CableNetwork.COLOR_BLUE:
-		pts = CableNetwork.ground_route(h.cable_from_point, w.inverter.terminal_for(&"bat"), w.floor_at, room.wall_z + 1.45, NAN)
-	else:
-		pts = CableNetwork.ground_route(w.switchboard.terminal, w.inverter.terminal_for(&"ac"), w.floor_at, room.wall_z + 1.15, NAN)
-	c.connect_cable(h.cable_color, pts)
+	var pts: PackedVector3Array = _world.cable_route(h.cable_color, h.cable_from_point)
+	_world.cables.connect_cable(h.cable_color, pts)
 	_hands.clear()
 	sfx("ok")
 	sfx("spark")
@@ -306,6 +304,75 @@ func connect_cable(to: StringName) -> void:
 	_rig.play_gesture(&"thumbs")
 	toast("¡Bien! Conectaste el %s." % CableNetwork.NAMES.get(h.cable_color, "cable"), &"good")
 	_changed()
+
+
+## Cable completo de una vez: se toma de su equipo y se conecta solo en su destino correcto
+## (para los chicos, alcanza con acercarse al equipo de donde sale; ver `_auto_wire`).
+func auto_connect(color: StringName) -> void:
+	if not can_auto_connect(color):
+		return
+	var w: PlantWorld = _world
+	match color:
+		CableNetwork.COLOR_ORANGE:
+			_hands.take_cable(color, &"junction", w.junction.terminal)
+			connect_cable(&"protection")
+		CableNetwork.COLOR_BLUE:
+			_hands.take_cable(color, &"battery", w.blue_source().terminal)
+			connect_cable(&"inverter")
+		_:
+			_hands.take_cable(color, &"switchboard", w.switchboard.terminal)
+			connect_cable(&"inverter")
+
+
+## ¿Se puede conectar ya ese cable? (naranja: con la protección puesta; azul: con una batería).
+func can_auto_connect(color: StringName) -> bool:
+	var w: PlantWorld = _world
+	if _phase != PHASE_BUILD or w.cables.cable_connected(color):
+		return false
+	match color:
+		CableNetwork.COLOR_ORANGE:
+			return w.protection.installed()
+		CableNetwork.COLOR_BLUE:
+			return w.batteries_installed() > 0
+		_:
+			return true
+
+
+## Equipo de donde sale cada cable (punto al que hay que acercarse).
+func _cable_source(color: StringName) -> Vector3:
+	match color:
+		CableNetwork.COLOR_ORANGE:
+			return _world.junction.approach
+		CableNetwork.COLOR_BLUE:
+			return _world.blue_source().approach
+		_:
+			return _world.switchboard.approach
+
+
+## Con las manos libres, acercarse al equipo de donde sale un cable lo conecta solo. Si todavía
+## falta algo (la protección o la batería), avisa una vez al llegar.
+func _auto_wire() -> void:
+	if _phase != PHASE_BUILD or _hands.kind() != HandsState.KIND_FREE:
+		return
+	for color: StringName in [CableNetwork.COLOR_ORANGE, CableNetwork.COLOR_BLUE, CableNetwork.COLOR_VIOLET]:
+		if _world.cables.cable_connected(color) or (color == CableNetwork.COLOR_BLUE and _world.batteries.is_empty()):
+			continue
+		var src: Vector3 = _cable_source(color)
+		var near: bool = Vector2(player.position.x - src.x, player.position.z - src.z).length() < AUTO_WIRE_RADIUS
+		var key: String = "%s:%d" % [color, _techs.find(_actor)]
+		if not near:
+			_auto_wire_near.erase(key)
+			continue
+		if can_auto_connect(color):
+			auto_connect(color)
+			_auto_wire_near.erase(key)
+			return
+		if not _auto_wire_near.has(key):
+			_auto_wire_near[key] = true
+			if color == CableNetwork.COLOR_ORANGE:
+				toast("Primero instalá la protección (cajón naranja) para conectar este cable.")
+			elif _purchase.batteries > 0:
+				toast("Primero instalá la batería (cajón azul) para conectar este cable.")
 
 
 ## Pista didáctica cuando el cable va al equipo equivocado.
@@ -326,29 +393,29 @@ func measure_rows() -> void:
 	sfx("beep")
 	m.show()
 	if _phase == PHASE_RUNNING and is_night():
-		m.set_reading("0 V", "V⎓ por fila", "De noche los paneles no generan tensión. Medí de día para buscar fallas.", &"idle")
+		m.set_reading("---", "por fila", "De noche los paneles no generan. Medí de día para buscar fallas.", &"idle")
 		return
 	var vals: Array[Variant] = []
 	for r: int in w.rows.size():
 		if w.panels_in_row(r) == 0:
 			vals.append(null)
 		elif w.row_open(r):
-			vals.append(0)
+			vals.append(false)
 		else:
-			vals.append(w.panels_in_row(r) * Inspectables.PANEL_VOC)
+			vals.append(true)
 	var parts: PackedStringArray = PackedStringArray()
 	for r: int in vals.size():
 		var v: Variant = vals[r]
-		parts.append("F%d %s" % [r + 1, "–" if v == null else str(v)])
+		parts.append("F%d %s" % [r + 1, "–" if v == null else ("OK" if v else "FALLA")])
 	var text: String = "  ".join(parts)
 	var bad: int = -1
 	for r: int in vals.size():
-		if vals[r] == 0:
+		if vals[r] is bool and not vals[r]:
 			bad = r
 			break
 	if bad >= 0:
 		connector.row_found = true
-		m.set_reading(text, "V⎓ por fila", "La fila %d marca 0 V: hay un circuito abierto. Medí panel por panel en esa fila." % (bad + 1), &"bad")
+		m.set_reading(text, "por fila", "La fila %d no genera: hay un circuito abierto. Medí panel por panel en esa fila." % (bad + 1), &"bad")
 	else:
 		var all_null: bool = true
 		for v: Variant in vals:
@@ -356,9 +423,9 @@ func measure_rows() -> void:
 				all_null = false
 				break
 		if all_null:
-			m.set_reading(text, "V⎓ por fila", "Todavía no hay paneles conectados a la caja.", &"idle")
+			m.set_reading(text, "por fila", "Todavía no hay paneles conectados a la caja.", &"idle")
 		else:
-			m.set_reading(text, "V⎓ por fila", "Tensiones normales: cada panel suma unos %d V en serie." % Inspectables.PANEL_VOC, &"ok")
+			m.set_reading(text, "por fila", "Todas las filas generan bien: los paneles de cada fila suman en serie.", &"ok")
 	_changed()
 
 
@@ -369,9 +436,9 @@ func measure_panel(mt: Mount) -> void:
 	if mt.faulty:
 		mt.fault_found = true
 		connector.row_found = true
-		m.set_reading("OL", "Ω conector", "Panel bien (%d V), pero el conector está abierto: tocá Reconectar." % Inspectables.PANEL_VOC, &"bad")
+		m.set_reading("ABIERTO", "conector", "El panel está bien, pero el conector está abierto: tocá Reconectar.", &"bad")
 	else:
-		m.set_reading("41,2 V", "V⎓ panel", "Panel y conector en buen estado.", &"ok")
+		m.set_reading("OK", "panel", "Panel y conector en buen estado.", &"ok")
 	_changed()
 
 
@@ -379,7 +446,7 @@ func repair_panel(mt: Mount) -> void:
 	mt.repair()
 	connector.fixed = true
 	sfx("ok")
-	_d.hud.meter.set_reading("41,2 V", "V⎓ panel", "Conector reparado: la fila vuelve a sumar tensión.", &"ok")
+	_d.hud.meter.set_reading("OK", "panel", "Conector reparado: la fila vuelve a generar.", &"ok")
 	toast("Conector reconectado. La fila vuelve a generar.", &"good")
 	_changed()
 
@@ -450,10 +517,32 @@ func _activate() -> void:
 	cam_rig.punch()
 	_rig.play_gesture(&"cheer")
 	if w.any_faulty():
-		toast("¡Planta activada! Pero una fila marca 0 V en el inversor. Usá el multímetro.", &"bad")
+		toast("¡Planta activada! Pero una fila no llega al inversor. Usá el multímetro.", &"bad")
 	else:
 		toast("¡Planta activada! Mirá cómo viaja la energía.", &"good")
 	_changed()
+
+
+## Precompila los shaders de los efectos que aparecen más tarde (chispas, polvo, brillos, flujo de
+## energía): se dibujan una vez bajo el piso, dentro del cuadro de la cámara, así el primer uso real
+## no traba el juego en celulares y teles (GL Compatibility compila cada shader al dibujarlo).
+func _warm_shaders() -> void:
+	var under: Vector3 = player.position + Vector3(0.0, -3.0, -3.0)
+	WorldFx.sparks(_world, under, 4)
+	WorldFx.dust(_world, under, 4)
+	WorldFx.glints(_world, under, 4)
+	var pts: PackedVector3Array = PackedVector3Array([under, under + Vector3(1.0, 0.0, 0.0), under + Vector3(2.0, 0.0, 0.0)])
+	var cv: CableVisual = _world.cables.run(pts, CableVisual.COLOR_PV, 0.03)
+	cv.set_glow(1.0)
+	for c: Color in [FLOW_DC, FLOW_BAT, FLOW_AC]:
+		var f: EnergyFlowVisual = _add_flow(cv, c)
+		f.set_on(true)
+	# Unos cuadros alcanzan; después se saca (las partículas se borran solas).
+	var t: SceneTreeTimer = Engine.get_main_loop().create_timer(1.0) if Engine.get_main_loop() is SceneTree else null
+	if t != null:
+		t.timeout.connect(func() -> void:
+			if is_instance_valid(cv):
+				cv.queue_free())
 
 
 static func _add_flow(cable: Variant, color: Color) -> EnergyFlowVisual:
@@ -528,6 +617,8 @@ func _frame(dt_real: float, moves: Array[Vector2]) -> void:
 			t.player.update(dt, mv.x, mv.y, cam_rig.yaw)
 		if _phase == PHASE_RUNNING:
 			_step_sim(dt)
+		if _auto_q != null:
+			_auto_q.update(dt_real)
 		if _phase == PHASE_FINISHED and _finish_timer >= 0.0:
 			_finish_timer += dt
 			if _finish_timer > 1.6:
@@ -553,6 +644,7 @@ func _frame(dt_real: float, moves: Array[Vector2]) -> void:
 	if not paused and _phase != PHASE_FINISHED:
 		for t: Technician in _techs:
 			_bind(t)
+			_auto_wire()
 			_update_interaction()
 			_save_actor()
 	_bind(_techs[0])
@@ -993,7 +1085,7 @@ func toggle_meter() -> void:
 		return
 	_hands.set_meter(true)
 	hud.actions.set_meter_on(true)
-	hud.meter.set_reading("--- V", "V⎓ CC", "Acercate a la caja de conexión o a un panel instalado y tocá Medir.", &"idle")
+	hud.meter.set_reading("---", "multímetro", "Acercate a la caja de conexión o a un panel instalado y tocá Medir.", &"idle")
 	hud.meter.show()
 
 
@@ -1104,11 +1196,11 @@ func _update_visuals(dt: float) -> void:
 	if s.blackout:
 		w.inverter.set_screen("SIN CARGA", Color("#ff5a4d"))
 	elif open_row >= 0 and s.irradiance > 0.05:
-		w.inverter.set_screen("F%d: 0 V" % (open_row + 1), Color("#ffb547"))
+		w.inverter.set_screen("F%d: FALLA" % (open_row + 1), Color("#ffb547"))
 	elif s.gen_kw > s.load_kw:
-		w.inverter.set_screen("ON %s kW" % JsMath.fmt_decimal(s.gen_kw), Color("#5fe3f5"))
+		w.inverter.set_screen("SOLAR ON", Color("#5fe3f5"))
 	else:
-		w.inverter.set_screen("BAT %s kW" % JsMath.fmt_decimal(s.load_kw), Color("#ffd27a"))
+		w.inverter.set_screen("BATERÍA", Color("#ffd27a"))
 
 	var gen: bool = s.gen_kw > 0.05 and _phase == PHASE_RUNNING
 	for r: int in _row_flows.size():
@@ -1176,14 +1268,20 @@ func force_interaction_update() -> void:
 
 
 ## Calidad gráfica del ambiente: 0 = baja, 1 = media, 2 = alta (ver `EnvironmentRig.set_quality`).
+## Calidad elegida en Ajustes: es el tope de `AutoQuality`, que la baja si los FPS no alcanzan.
 func set_quality(q: int) -> void:
-	_env.set_quality(q)
+	if _auto_q == null:
+		_auto_q = AutoQuality.new(_env, root.get_viewport() if root.is_inside_tree() else null, q)
+	else:
+		_auto_q.set_cap(q)
 
 
 func dispose() -> void:
 	if _disposed:
 		return
 	_disposed = true
+	if root.is_inside_tree():
+		root.get_viewport().scaling_3d_scale = 1.0
 	_d.audio.set_wind(false)
 	for t: Technician in _techs:
 		t.hands.clear()

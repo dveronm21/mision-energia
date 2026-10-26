@@ -1149,7 +1149,7 @@
     "blackoutHour": 19.000000000000128,
     "durationSec": 90,
     "tips": [
-     "Con 0 baterías guardás 0 kWh y la noche pide más. En el taller, probá sumar otra batería.",
+     "Con 0 baterías no alcanza para toda la noche. En el taller, probá sumar otra batería.",
      "Quedaron encendidas cargas que no son esenciales. De noche, apagá lo que no haga falta para que la energía guardada alcance."
     ]
    }
@@ -7825,7 +7825,7 @@
     "blackoutHour": 28.600000000000264,
     "durationSec": 90,
     "tips": [
-     "Con una batería guardás 7 kWh y la noche pide más. En el taller, probá sumar otra batería.",
+     "Con una batería no alcanza para toda la noche. En el taller, probá sumar otra batería.",
      "Con pocos paneles las baterías no llegan llenas a la noche. Instalá más paneles para generar el excedente que vas a guardar.",
      "Quedaron encendidas cargas que no son esenciales. De noche, apagá lo que no haga falta para que la energía guardada alcance."
     ]
@@ -11082,7 +11082,7 @@
     "blackoutHour": 28.050000000000257,
     "durationSec": 90,
     "tips": [
-     "Con una batería guardás 7 kWh y la noche pide más. En el taller, probá sumar otra batería.",
+     "Con una batería no alcanza para toda la noche. En el taller, probá sumar otra batería.",
      "Con pocos paneles las baterías no llegan llenas a la noche. Instalá más paneles para generar el excedente que vas a guardar.",
      "Quedaron encendidas cargas que no son esenciales. De noche, apagá lo que no haga falta para que la energía guardada alcance."
     ]
@@ -14046,7 +14046,7 @@
     "blackoutHour": 28.100000000000257,
     "durationSec": 90,
     "tips": [
-     "Con una batería guardás 7 kWh y la noche pide más. En el taller, probá sumar otra batería.",
+     "Con una batería no alcanza para toda la noche. En el taller, probá sumar otra batería.",
      "Con pocos paneles las baterías no llegan llenas a la noche. Instalá más paneles para generar el excedente que vas a guardar.",
      "Quedaron encendidas cargas que no son esenciales. De noche, apagá lo que no haga falta para que la energía guardada alcance."
     ]
@@ -17761,7 +17761,7 @@
     "blackoutHour": 27.950000000000255,
     "durationSec": 90,
     "tips": [
-     "Con una batería guardás 7 kWh y la noche pide más. En el taller, probá sumar otra batería.",
+     "Con una batería no alcanza para toda la noche. En el taller, probá sumar otra batería.",
      "Con pocos paneles las baterías no llegan llenas a la noche. Instalá más paneles para generar el excedente que vas a guardar.",
      "Quedaron encendidas cargas que no son esenciales. De noche, apagá lo que no haga falta para que la energía guardada alcance."
     ]
@@ -20827,7 +20827,7 @@
     "blackoutHour": null,
     "durationSec": 90,
     "tips": [
-     "Con 2 baterías guardás 14 kWh y la noche pide más. En el taller, probá sumar otra batería.",
+     "Con 2 baterías no alcanza para toda la noche. En el taller, probá sumar otra batería.",
      "Con pocos paneles las baterías no llegan llenas a la noche. Instalá más paneles para generar el excedente que vas a guardar."
     ]
    }
@@ -24386,7 +24386,7 @@
     "blackoutHour": 23.30000000000019,
     "durationSec": 90,
     "tips": [
-     "Con una batería guardás 7 kWh y la noche pide más. En el taller, probá sumar otra batería.",
+     "Con una batería no alcanza para toda la noche. En el taller, probá sumar otra batería.",
      "Con pocos paneles las baterías no llegan llenas a la noche. Instalá más paneles para generar el excedente que vas a guardar.",
      "Quedaron encendidas cargas que no son esenciales. De noche, apagá lo que no haga falta para que la energía guardada alcance."
     ]
@@ -27452,7 +27452,7 @@
     "blackoutHour": null,
     "durationSec": 90,
     "tips": [
-     "Con 3 baterías guardás 21 kWh y la noche pide más. En el taller, probá sumar otra batería.",
+     "Con 3 baterías no alcanza para toda la noche. En el taller, probá sumar otra batería.",
      "Con pocos paneles las baterías no llegan llenas a la noche. Instalá más paneles para generar el excedente que vas a guardar."
     ]
    }
@@ -30862,7 +30862,7 @@
     "blackoutHour": 22.250000000000174,
     "durationSec": 90,
     "tips": [
-     "Con una batería guardás 7 kWh y la noche pide más. En el taller, probá sumar otra batería.",
+     "Con una batería no alcanza para toda la noche. En el taller, probá sumar otra batería.",
      "Con pocos paneles las baterías no llegan llenas a la noche. Instalá más paneles para generar el excedente que vas a guardar.",
      "Quedaron encendidas cargas que no son esenciales. De noche, apagá lo que no haga falta para que la energía guardada alcance."
     ]
@@ -35304,7 +35304,7 @@
     "blackoutHour": 19,
     "durationSec": 80,
     "tips": [
-     "Con 0 baterías guardás 0 kWh y la noche pide más. En el taller, probá sumar otra batería."
+     "Con 0 baterías no alcanza para toda la noche. En el taller, probá sumar otra batería."
     ]
    }
   },
@@ -35690,7 +35690,7 @@
     "tips": [
      "Una fila nunca generó: tenía un conector flojo. Medí con el multímetro en la caja de conexión y reparalo: en serie, un solo panel flojo apaga toda la fila.",
      "Los paneles quedaron con polvo del Zonda y rindieron 35% menos. Cuando pase el viento, limpialos en el poste de cada fila.",
-     "Con una batería guardás 7 kWh y la noche pide más. En el taller, probá sumar otra batería."
+     "Con una batería no alcanza para toda la noche. En el taller, probá sumar otra batería."
     ]
    }
   },
@@ -35722,7 +35722,7 @@
     "blackoutHour": 27,
     "durationSec": 80,
     "tips": [
-     "Con una batería guardás 7 kWh y la noche pide más. En el taller, probá sumar otra batería."
+     "Con una batería no alcanza para toda la noche. En el taller, probá sumar otra batería."
     ]
    }
   },
@@ -35754,7 +35754,7 @@
     "blackoutHour": 19,
     "durationSec": 80,
     "tips": [
-     "Con 0 baterías guardás 0 kWh y la noche pide más. En el taller, probá sumar otra batería."
+     "Con 0 baterías no alcanza para toda la noche. En el taller, probá sumar otra batería."
     ]
    }
   },
@@ -36140,7 +36140,7 @@
     "tips": [
      "Una fila nunca generó: tenía un conector flojo. Medí con el multímetro en la caja de conexión y reparalo: en serie, un solo panel flojo apaga toda la fila.",
      "Los paneles quedaron con polvo del Zonda y rindieron 35% menos. Cuando pase el viento, limpialos en el poste de cada fila.",
-     "Con una batería guardás 7 kWh y la noche pide más. En el taller, probá sumar otra batería."
+     "Con una batería no alcanza para toda la noche. En el taller, probá sumar otra batería."
     ]
    }
   },
@@ -36172,7 +36172,7 @@
     "blackoutHour": 27,
     "durationSec": 80,
     "tips": [
-     "Con una batería guardás 7 kWh y la noche pide más. En el taller, probá sumar otra batería.",
+     "Con una batería no alcanza para toda la noche. En el taller, probá sumar otra batería.",
      "Con pocos paneles las baterías no llegan llenas a la noche. Instalá más paneles para generar el excedente que vas a guardar."
     ]
    }
@@ -36205,7 +36205,7 @@
     "blackoutHour": 19,
     "durationSec": 80,
     "tips": [
-     "Con 0 baterías guardás 0 kWh y la noche pide más. En el taller, probá sumar otra batería.",
+     "Con 0 baterías no alcanza para toda la noche. En el taller, probá sumar otra batería.",
      "Con pocos paneles las baterías no llegan llenas a la noche. Instalá más paneles para generar el excedente que vas a guardar."
     ]
    }
@@ -36526,7 +36526,7 @@
     "blackoutHour": null,
     "durationSec": 80,
     "tips": [
-     "Con 2 baterías guardás 14 kWh y la noche pide más. En el taller, probá sumar otra batería.",
+     "Con 2 baterías no alcanza para toda la noche. En el taller, probá sumar otra batería.",
      "Con pocos paneles las baterías no llegan llenas a la noche. Instalá más paneles para generar el excedente que vas a guardar."
     ]
    }
@@ -36559,7 +36559,7 @@
     "blackoutHour": 26,
     "durationSec": 80,
     "tips": [
-     "Con 2 baterías guardás 14 kWh y la noche pide más. En el taller, probá sumar otra batería.",
+     "Con 2 baterías no alcanza para toda la noche. En el taller, probá sumar otra batería.",
      "Con pocos paneles las baterías no llegan llenas a la noche. Instalá más paneles para generar el excedente que vas a guardar."
     ]
    }
@@ -36594,7 +36594,7 @@
     "tips": [
      "Una fila nunca generó: tenía un conector flojo. Medí con el multímetro en la caja de conexión y reparalo: en serie, un solo panel flojo apaga toda la fila.",
      "Los paneles quedaron con polvo del Zonda y rindieron 35% menos. Cuando pase el viento, limpialos en el poste de cada fila.",
-     "Con una batería guardás 7 kWh y la noche pide más. En el taller, probá sumar otra batería."
+     "Con una batería no alcanza para toda la noche. En el taller, probá sumar otra batería."
     ]
    }
   },
@@ -36626,7 +36626,7 @@
     "blackoutHour": 27,
     "durationSec": 80,
     "tips": [
-     "Con una batería guardás 7 kWh y la noche pide más. En el taller, probá sumar otra batería.",
+     "Con una batería no alcanza para toda la noche. En el taller, probá sumar otra batería.",
      "Con pocos paneles las baterías no llegan llenas a la noche. Instalá más paneles para generar el excedente que vas a guardar."
     ]
    }
@@ -36659,7 +36659,7 @@
     "blackoutHour": 19,
     "durationSec": 80,
     "tips": [
-     "Con 0 baterías guardás 0 kWh y la noche pide más. En el taller, probá sumar otra batería.",
+     "Con 0 baterías no alcanza para toda la noche. En el taller, probá sumar otra batería.",
      "Con pocos paneles las baterías no llegan llenas a la noche. Instalá más paneles para generar el excedente que vas a guardar."
     ]
    }
@@ -36692,7 +36692,7 @@
     "blackoutHour": 27,
     "durationSec": 80,
     "tips": [
-     "Con 2 baterías guardás 14 kWh y la noche pide más. En el taller, probá sumar otra batería.",
+     "Con 2 baterías no alcanza para toda la noche. En el taller, probá sumar otra batería.",
      "Con pocos paneles las baterías no llegan llenas a la noche. Instalá más paneles para generar el excedente que vas a guardar."
     ]
    }
@@ -36725,7 +36725,7 @@
     "blackoutHour": 27,
     "durationSec": 80,
     "tips": [
-     "Con 2 baterías guardás 14 kWh y la noche pide más. En el taller, probá sumar otra batería."
+     "Con 2 baterías no alcanza para toda la noche. En el taller, probá sumar otra batería."
     ]
    }
   },
@@ -36981,7 +36981,7 @@
     "blackoutHour": null,
     "durationSec": 80,
     "tips": [
-     "Con 2 baterías guardás 14 kWh y la noche pide más. En el taller, probá sumar otra batería.",
+     "Con 2 baterías no alcanza para toda la noche. En el taller, probá sumar otra batería.",
      "Con pocos paneles las baterías no llegan llenas a la noche. Instalá más paneles para generar el excedente que vas a guardar."
     ]
    }
@@ -37014,7 +37014,7 @@
     "blackoutHour": 26,
     "durationSec": 80,
     "tips": [
-     "Con 2 baterías guardás 14 kWh y la noche pide más. En el taller, probá sumar otra batería.",
+     "Con 2 baterías no alcanza para toda la noche. En el taller, probá sumar otra batería.",
      "Con pocos paneles las baterías no llegan llenas a la noche. Instalá más paneles para generar el excedente que vas a guardar."
     ]
    }
@@ -37049,7 +37049,7 @@
     "tips": [
      "Una fila nunca generó: tenía un conector flojo. Medí con el multímetro en la caja de conexión y reparalo: en serie, un solo panel flojo apaga toda la fila.",
      "Los paneles quedaron con polvo del Zonda y rindieron 35% menos. Cuando pase el viento, limpialos en el poste de cada fila.",
-     "Con una batería guardás 7 kWh y la noche pide más. En el taller, probá sumar otra batería."
+     "Con una batería no alcanza para toda la noche. En el taller, probá sumar otra batería."
     ]
    }
   },
@@ -37081,7 +37081,7 @@
     "blackoutHour": 27,
     "durationSec": 80,
     "tips": [
-     "Con una batería guardás 7 kWh y la noche pide más. En el taller, probá sumar otra batería.",
+     "Con una batería no alcanza para toda la noche. En el taller, probá sumar otra batería.",
      "Con pocos paneles las baterías no llegan llenas a la noche. Instalá más paneles para generar el excedente que vas a guardar."
     ]
    }
@@ -37114,7 +37114,7 @@
     "blackoutHour": 19,
     "durationSec": 80,
     "tips": [
-     "Con 0 baterías guardás 0 kWh y la noche pide más. En el taller, probá sumar otra batería.",
+     "Con 0 baterías no alcanza para toda la noche. En el taller, probá sumar otra batería.",
      "Con pocos paneles las baterías no llegan llenas a la noche. Instalá más paneles para generar el excedente que vas a guardar."
     ]
    }
@@ -37147,7 +37147,7 @@
     "blackoutHour": 27,
     "durationSec": 80,
     "tips": [
-     "Con 2 baterías guardás 14 kWh y la noche pide más. En el taller, probá sumar otra batería.",
+     "Con 2 baterías no alcanza para toda la noche. En el taller, probá sumar otra batería.",
      "Con pocos paneles las baterías no llegan llenas a la noche. Instalá más paneles para generar el excedente que vas a guardar."
     ]
    }
@@ -37180,7 +37180,7 @@
     "blackoutHour": 27,
     "durationSec": 80,
     "tips": [
-     "Con 2 baterías guardás 14 kWh y la noche pide más. En el taller, probá sumar otra batería."
+     "Con 2 baterías no alcanza para toda la noche. En el taller, probá sumar otra batería."
     ]
    }
   },

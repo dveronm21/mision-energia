@@ -12,7 +12,7 @@ const MAX_TIPS: int = 3
 const TIP_CONNECTOR: String = "Una fila nunca generó: tenía un conector flojo. Medí con el multímetro en la caja de conexión y reparalo: en serie, un solo panel flojo apaga toda la fila."
 const TIP_DUST: String = "Los paneles quedaron con polvo del Zonda y rindieron 35% menos. Cuando pase el viento, limpialos en el poste de cada fila."
 const TIP_WIND: String = "El Zonda voló %s. Cuando suene la alarma, poné cada fila en defensa (horizontal) o instalá las trabas anti-Zonda."
-const TIP_BATTERIES: String = "Con %s guardás %s kWh y la noche pide más. En el taller, probá sumar otra batería."
+const TIP_BATTERIES: String = "Con %s no alcanza para toda la noche. En el taller, probá sumar otra batería."
 const TIP_FEW_PANELS: String = "Con pocos paneles las baterías no llegan llenas a la noche. Instalá más paneles para generar el excedente que vas a guardar."
 const TIP_NON_ESSENTIAL: String = "Quedaron encendidas cargas que no son esenciales. De noche, apagá lo que no haga falta para que la energía guardada alcance."
 const TIP_THIRD_STAR: String = "¡Muy bien! Para la tercera estrella, buscá la misma luz gastando menos créditos de obra."
@@ -63,7 +63,7 @@ func _tips(level: LevelDefinition, i: ScoringInput, star_count: int) -> Array[St
 		t.append(TIP_WIND % ("un panel" if i.panels_lost == 1 else "%d paneles" % i.panels_lost))
 	if struggled and i.batteries < level.battery_slots:
 		var bats_txt: String = "una batería" if i.batteries == 1 else "%d baterías" % i.batteries
-		t.append(TIP_BATTERIES % [bats_txt, JsMath.fmt_decimal(float(i.batteries) * level.battery_kwh)])
+		t.append(TIP_BATTERIES % bats_txt)
 	var max_panels: int = level.rows * level.panels_per_row
 	if struggled and i.panels != ScoringInput.PANELS_UNKNOWN and i.panels < ceili(float(max_panels) * 0.75):
 		t.append(TIP_FEW_PANELS)

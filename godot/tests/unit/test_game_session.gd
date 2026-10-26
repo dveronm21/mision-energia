@@ -39,6 +39,24 @@ func test_game_session_arma_una_partida_de_casa() -> void:
 	s.dispose()
 
 
+func test_game_session_cables_se_conectan_solos() -> void:
+	var s: GameSession = GameSession.new(_deps(Levels.casa(), Purchase.make(4, 1, false)))
+	check(not s.can_auto_connect(CableNetwork.COLOR_ORANGE), "naranja espera la protección")
+	check(not s.can_auto_connect(CableNetwork.COLOR_BLUE), "azul espera la batería")
+	check(s.can_auto_connect(CableNetwork.COLOR_VIOLET), "violeta se puede de entrada")
+	s.take_pickup(_find_pickup(s, &"protection"))
+	s.install_protection()
+	s.take_pickup(_find_pickup(s, &"battery"))
+	s.install_battery(0)
+	# Acercarse al equipo de donde sale cada cable lo conecta entero.
+	for color: StringName in [CableNetwork.COLOR_ORANGE, CableNetwork.COLOR_BLUE, CableNetwork.COLOR_VIOLET]:
+		var src: Vector3 = s._cable_source(color)
+		s.player.position = Vector3(src.x, 0.0, src.z)
+		s.update(0.05, Vector2.ZERO)
+		check(s.world().cables.cable_connected(color), "cable %s conectado al acercarse" % color)
+	check_eq(s.hands().kind(), HandsState.KIND_FREE, "las manos quedan libres")
+
+
 func test_game_session_arma_la_planta_completa_y_activa() -> void:
 	var level: LevelDefinition = Levels.casa()
 	var purchase: Purchase = Purchase.make(4, 1, false)

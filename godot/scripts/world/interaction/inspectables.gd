@@ -19,7 +19,7 @@ func inspectables(out: Array[InspectEntry]) -> void:
 
 	for m: Mount in w.mounts:
 		var title: String = "Panel solar · fila %d" % (m.row + 1) if m.filled() else "Estructura vacía"
-		var body: String = ("Convierte la luz del sol en corriente continua. Cada panel aporta hasta %s kW y unos %d V; los paneles de una fila van en serie, así que un conector flojo apaga toda la fila." % [JsMath.fmt_decimal(lv.panel_kw), PANEL_VOC]) if m.filled() \
+		var body: String = "Convierte la luz del sol en corriente continua. Los paneles de una fila van en serie, así que un conector flojo apaga toda la fila." if m.filled() \
 			else "Acá va un panel solar. La estructura está inclinada para aprovechar mejor el sol de la mañana a la tarde."
 		var mount: Mount = m
 		out.append(InspectEntry.new("mount:%d:%d" % [m.row, m.index], m.approach, title, body,
@@ -35,10 +35,10 @@ func inspectables(out: Array[InspectEntry]) -> void:
 		out.append(InspectEntry.new("pickup:%d" % i, p.approach, t[0], t[1]))
 
 	out.append(InspectEntry.new("junction", w.junction.approach, "Caja de conexión del campo",
-		"Junta la energía de todas las filas en un circuito de corriente continua. Con el multímetro podés medir la tensión de cada fila.",
+		"Junta la energía de todas las filas en un circuito de corriente continua. Con el multímetro podés revisar cada fila.",
 		func() -> String:
 			var s: SimSnapshot = snap.call()
-			return "Llegan %s kW del campo solar" % JsMath.fmt_decimal(s.gen_kw) if s != null else "%d paneles conectados" % w.panels_installed()))
+			return ("Llega energía del campo solar" if s.gen_kw > 0.05 else "Sin energía del campo solar") if s != null else "%d paneles conectados" % w.panels_installed()))
 
 	for p: RowPost in w.posts:
 		var post: RowPost = p
@@ -64,16 +64,16 @@ func inspectables(out: Array[InspectEntry]) -> void:
 			if s == null:
 				return "En espera"
 			if s.net_kw > 0.05:
-				return "Cargando baterías con %s kW" % JsMath.fmt_decimal(s.net_kw)
+				return "Cargando baterías con lo que sobra"
 			if s.net_kw < -0.05:
-				return "Usando baterías: %s kW" % JsMath.fmt_decimal(-s.net_kw)
+				return "Usando energía de las baterías"
 			return "En equilibrio"))
 
 	for b: BatterySlot in w.batteries:
 		var battery: BatterySlot = b
 		out.append(InspectEntry.new("battery:%d" % b.index, b.approach,
 			"Batería de litio" if b.installed() else "Base para batería",
-			("Guarda la energía que sobra de día para usarla de noche. Capacidad útil: %s kWh." % JsMath.fmt_decimal(lv.battery_kwh)) if b.installed() else "Lugar marcado para una batería.",
+			"Guarda la energía que sobra de día para usarla de noche." if b.installed() else "Lugar marcado para una batería.",
 			func() -> Variant:
 				var s: SimSnapshot = snap.call()
 				return "Carga del banco: %d%%" % roundi(s.soc_pct * 100.0) if (battery.installed() and s != null) else null))
@@ -82,7 +82,7 @@ func inspectables(out: Array[InspectEntry]) -> void:
 		"Recibe la corriente alterna del inversor y la reparte hacia la ciudad, con térmicas y disyuntor para cada circuito.",
 		func() -> Variant:
 			var s: SimSnapshot = snap.call()
-			return "La ciudad consume %s kW" % JsMath.fmt_decimal(s.load_kw) if s != null else null))
+			return ("Repartiendo energía a la ciudad" if not s.blackout else "Sin energía: la ciudad está a oscuras") if s != null else null))
 
 	out.append(InspectEntry.new("console", w.console.approach, "Consola de control",
 		"Cuando todo esté instalado y conectado, activá la planta acá. Necesitás al menos %d paneles, la protección, las baterías y los tres cables." % lv.min_panels))
@@ -101,7 +101,7 @@ func inspectables(out: Array[InspectEntry]) -> void:
 static func _pickup_text(kind: StringName, lv: LevelDefinition) -> Array[String]:
 	match kind:
 		&"battery":
-			return ["Batería embalada", "Batería de litio de %s kWh útiles. Va en una de las bases de la sala de equipos." % JsMath.fmt_decimal(lv.battery_kwh)]
+			return ["Batería embalada", "Batería de litio. Va en una de las bases de la sala de equipos."]
 		&"protection":
 			return ["Protección embalada", "Fusible y seccionador de corriente continua. Va en la pared, a la izquierda del inversor."]
 		&"kit":

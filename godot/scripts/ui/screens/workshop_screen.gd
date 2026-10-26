@@ -74,8 +74,8 @@ func _build_story(max_panels: int) -> VBoxContainer:
 
 	var facts: VBoxContainer = VBoxContainer.new()
 	facts.add_theme_constant_override("separation", 6)
-	facts.add_child(_fact(&"panel", "Hasta %d paneles de %s kW" % [max_panels, JsMath.fmt_decimal(_lv.panel_kw)]))
-	facts.add_child(_fact(&"battery-plus", "Hasta %d baterías de %s kWh" % [_lv.battery_slots, JsMath.fmt_decimal(_lv.battery_kwh)]))
+	facts.add_child(_fact(&"panel", "Hasta %d paneles solares" % max_panels))
+	facts.add_child(_fact(&"battery-plus", ("Hasta 1 batería" if _lv.battery_slots == 1 else "Hasta %d baterías" % _lv.battery_slots)))
 	facts.add_child(_fact(&"sun", "Activás a las %s; aguantá hasta las %s" % [JsMath.fmt_hour(_lv.start_hour), JsMath.fmt_hour(_lv.end_hour)]))
 	if _lv.events.zonda_at_hour != LevelEvents.NO_ZONDA:
 		facts.add_child(_fact(&"wind", "Pronóstico: viento Zonda a las %s" % JsMath.fmt_hour(_lv.events.zonda_at_hour), true))
@@ -118,9 +118,9 @@ func _build_shop() -> PanelContainer:
 	eb.add_child(UiTheme.eyebrow("Taller de compras", UiTheme.SUN_INK))
 	col.add_child(eb)
 
-	_row_panels = _stepper(&"panel", "Paneles solares", "%s kW c/u · %s créditos" % [JsMath.fmt_decimal(_lv.panel_kw), UiFormat.fmt_int(_lv.prices.panel)], 1)
+	_row_panels = _stepper(&"panel", "Paneles solares", "%s créditos c/u" % UiFormat.fmt_int(_lv.prices.panel), 1)
 	col.add_child(_row_panels.root)
-	_row_batteries = _stepper(&"battery-plus", "Baterías de litio", "%s kWh c/u · %s créditos" % [JsMath.fmt_decimal(_lv.battery_kwh), UiFormat.fmt_int(_lv.prices.battery)], 2)
+	_row_batteries = _stepper(&"battery-plus", "Baterías de litio", "%s créditos c/u" % UiFormat.fmt_int(_lv.prices.battery), 2)
 	col.add_child(_row_batteries.root)
 	_row_kit = _stepper(&"wind", "Kit anti-Zonda", "Trabas para los paneles · %s créditos" % UiFormat.fmt_int(_lv.prices.kit_zonda), 3)
 	_row_kit.root.visible = _lv.events.zonda_at_hour != LevelEvents.NO_ZONDA
@@ -349,9 +349,9 @@ func _update() -> void:
 	else:
 		_bar_fill.anchor_right = pct
 	_bar_fill.add_theme_stylebox_override("panel", UiTheme.box(UiTheme.WARN if sp > bud else UiTheme.SUN, 999))
-	var gen: float = _p.panels * _lv.panel_kw
-	var store: float = _p.batteries * _lv.battery_kwh
-	_summary_label.text = "Generás hasta %s kW · Guardás %s kWh" % [JsMath.fmt_decimal(gen), JsMath.fmt_decimal(store)]
+	_summary_label.text = "%s · %s" % [
+		"1 panel" if _p.panels == 1 else "%d paneles" % _p.panels,
+		"1 batería" if _p.batteries == 1 else "%d baterías" % _p.batteries]
 
 	var msg: String = ""
 	if sp > bud:

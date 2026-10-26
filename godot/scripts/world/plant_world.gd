@@ -40,6 +40,13 @@ var drone: Drone
 var kit_installed: bool = false
 
 var _pallet_label: LabelVisual
+## Auras de los lugares donde van la protección y cada batería comprada.
+var _protection_aura: AuraVisual
+var _battery_auras: Array[AuraVisual] = []
+var _batteries_bought: int = 0
+## color → CableGuideVisual (camino punteado de los cables sin conectar).
+var _guides: Dictionary[StringName, CableGuideVisual] = {}
+var _guides_key: String = ""
 var _room_light: OmniLight3D
 var _lamp_mat: StandardMaterial3D
 
@@ -57,6 +64,7 @@ func _init(p_level: LevelDefinition, purchase: Purchase, on_row_clean_by_drone: 
 	_build_pump()
 	_build_depot(purchase)
 	_build_cables_and_city()
+	_build_auras()
 
 
 func _add(n: Node3D) -> Node3D:
@@ -106,18 +114,25 @@ func _build_room() -> void:
 	var slab: Node3D = ModelLibrary.instantiate(&"slab")
 	slab.position = Vector3(r.slab.x, 0.0, r.slab.z)
 	_add(slab)
+	_restyle(slab, "slab_tiles.png")
 	var wall: Node3D = ModelLibrary.instantiate(&"wall")
 	wall.position = Vector3(r.slab.x, r.floor_y, r.wall_z)
 	_add(wall)
 	var canopy: Node3D = ModelLibrary.instantiate(&"canopy")
 	canopy.position = Vector3(r.slab.x, r.floor_y, r.wall_z + 0.8)
 	_add(canopy)
+	_restyle(canopy, "canopy_sheet.png")
 	colliders.add(r.slab.x, r.wall_z - 0.15, r.slab.w / 2.0, 0.45)
 	# Cartel de EPSE parado sobre el borde de atrás del techo.
 	var logo: EpseLogoVisual = EpseLogoVisual.new(1.6)
 	logo.position = Vector3(r.slab.x, r.floor_y + ROOF_TOP_Y, r.wall_z - 0.1)
 	_add(logo)
 	_label("SALA DE EQUIPOS", r.label, 0.7)
+	# Logos de EPSE pegados en la platea como vinilos, a los lados de la consola.
+	for dx: float in [-3.3, 3.3]:
+		var vinyl: MeshInstance3D = EpseLogoVisual.floor_decal(2.8)
+		vinyl.position = Vector3(r.slab.x + dx, r.floor_y + 0.006, r.console.z + 0.1)
+		_add(vinyl)
 
 	# Luz de la sala: se enciende de noche con la energía de las baterías (siempre presente
 	# para no recompilar shaders).
@@ -157,6 +172,16 @@ func _build_room() -> void:
 	_label("ACTIVAR PLANTA", Vector3(r.console.x, 1.75, r.console.z), 0.55, LabelVisual.BG_ACCENT)
 
 
+## Cambia la textura del modelo por la estilizada (tools/stylized_textures); el color por vértice queda.
+static func _restyle(model: Node3D, file_name: String) -> void:
+	var mi: MeshInstance3D = ModelLibrary.find_mesh(model)
+	if mi == null:
+		return
+	var m: BaseMaterial3D = ModelLibrary.own_material(mi)
+	m.albedo_texture = load("res://assets/textures/stylized/" + file_name) as Texture2D
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+
+
 func _build_pump() -> void:
 	if layout.pump == null:
 		return
@@ -170,6 +195,7 @@ func _build_pump() -> void:
 # ------------------------------------------------------------------------------- depósito y pallet
 
 func _build_depot(purchase: Purchase) -> void:
+	_batteries_bought = purchase.batteries
 	pallet = Pallet.new(layout.pallet, purchase.panels, level.events.loose_connector)
 	_add(pallet.visual)
 	colliders.add(layout.pallet.x, layout.pallet.z, 1.1, 0.66)
@@ -209,6 +235,60 @@ func _build_cables_and_city() -> void:
 
 
 var _on_row_clean_by_drone: Callable
+
+
+func _build_auras() -> void:
+	_protection_aura = AuraVisual.new(AuraVisual.COLOR_PROTECTION, 0.7)
+	_protection_aura.position = Vector3(protection.position.x, layout.room.floor_y, protection.position.z + 0.45)
+	_add(_protection_aura)
+	for b: BatterySlot in batteries:
+		var a: AuraVisual = AuraVisual.new(AuraVisual.COLOR_BATTERY, 0.7)
+		a.position = b.position
+		_add(a)
+		_battery_auras.append(a)
+	_refresh_guides()
+
+
+## Recorrido por el piso de cada cable de la obra (el mismo para la guía punteada y el cable).
+## `from`: borne de la batería para el azul (los otros salen de su equipo fijo).
+func cable_route(color: StringName, from: Vector3 = Vector3.ZERO) -> PackedVector3Array:
+	var room: RoomLayout = layout.room
+	match color:
+		CableNetwork.COLOR_ORANGE:
+			return CableNetwork.ground_route(junction.terminal, protection.terminal, floor_at, layout.junction.z + 0.45, NAN)
+		CableNetwork.COLOR_BLUE:
+			return CableNetwork.ground_route(from, inverter.terminal_for(&"bat"), floor_at, room.wall_z + 1.45, NAN)
+		_:
+			return CableNetwork.ground_route(switchboard.terminal, inverter.terminal_for(&"ac"), floor_at, room.wall_z + 1.15, NAN)
+
+
+## Borne de donde sale el cable azul: la primera batería instalada (o la primera base).
+func blue_source() -> BatterySlot:
+	for b: BatterySlot in batteries:
+		if b.installed():
+			return b
+	return batteries[0] if not batteries.is_empty() else null
+
+
+## Rehace los caminos punteados cuando cambia algo que los mueve (cables, protección, baterías).
+func _refresh_guides() -> void:
+	var key: String = "%s|%s|%s|%s|%d" % [cables.cable_connected(CableNetwork.COLOR_ORANGE), cables.cable_connected(CableNetwork.COLOR_BLUE),
+		cables.cable_connected(CableNetwork.COLOR_VIOLET), protection.installed(), batteries_installed()]
+	if key == _guides_key:
+		return
+	_guides_key = key
+	for g: CableGuideVisual in _guides.values():
+		g.queue_free()
+	_guides.clear()
+	for color: StringName in [CableNetwork.COLOR_ORANGE, CableNetwork.COLOR_BLUE, CableNetwork.COLOR_VIOLET]:
+		if cables.cable_connected(color):
+			continue
+		var src: BatterySlot = blue_source()
+		if color == CableNetwork.COLOR_BLUE and (src == null or _batteries_bought == 0):
+			continue
+		var g: CableGuideVisual = CableGuideVisual.new(cable_route(color, src.terminal if src != null else Vector3.ZERO), CableNetwork.color_for(color), floor_at)
+		_add(g)
+		_guides[color] = g
 
 
 func _on_row_clean_relay(row: int) -> void:
@@ -295,6 +375,10 @@ func set_room_light(v: float) -> void:
 func update(dt: float, drone_dt: float = -1.0) -> void:
 	drone.update(dt if drone_dt < 0.0 else drone_dt)
 	_pallet_label.visible = pallet.remaining() > 0
+	_protection_aura.visible = not protection.installed()
+	for i: int in _battery_auras.size():
+		_battery_auras[i].visible = i < _batteries_bought and not batteries[i].installed() and batteries_installed() < _batteries_bought
+	_refresh_guides()
 
 
 func dispose() -> void:

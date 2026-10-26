@@ -146,9 +146,12 @@ static func _bounce(b: BaseButton, to: Vector2, sec: float, trans: Tween.Transit
 	if not b.is_inside_tree():
 		return
 	b.pivot_offset = b.size / 2.0
-	var old: Tween = b.get_meta(&"bounce_tween", null) as Tween
-	if old != null and old.is_valid():
-		old.kill()
+	# Ojo: `get_meta(clave, null)` igual da error si falta la clave (null cuenta como "sin valor
+	# por defecto"), por eso se pregunta antes.
+	if b.has_meta(&"bounce_tween"):
+		var old: Tween = b.get_meta(&"bounce_tween") as Tween
+		if old != null and old.is_valid():
+			old.kill()
 	var t: Tween = b.create_tween()
 	t.tween_property(b, "scale", to, sec).set_trans(trans).set_ease(Tween.EASE_OUT)
 	b.set_meta(&"bounce_tween", t)

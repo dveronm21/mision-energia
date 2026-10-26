@@ -76,6 +76,14 @@ func connect_cable(_to: StringName) -> void:
 	pass
 
 
+func auto_connect(_color: StringName) -> void:
+	pass
+
+
+func can_auto_connect(_color: StringName) -> bool:
+	return false
+
+
 func measure_rows() -> void:
 	pass
 
