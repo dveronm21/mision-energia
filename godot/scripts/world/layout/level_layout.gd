@@ -69,7 +69,8 @@ static func build(level: LevelDefinition, purchase: Purchase) -> LevelLayout:
 	room.switchboard = Vector3(11.2, floor_y, -6.9)
 	room.batteries = batteries
 	room.console = Vector3(7.0, floor_y, -2.2)
-	room.label = Vector3(7.0, 3.75, -6.4)
+	# Arriba del cartel de EPSE que va sobre el techo.
+	room.label = Vector3(7.0, 5.85, -6.4)
 	layout.room = room
 
 	layout.pump = Vector3(15.2, 0.0, -5.2) if level.has_pump else null

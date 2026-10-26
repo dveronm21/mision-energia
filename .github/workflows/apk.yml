@@ -5,7 +5,11 @@ name: Compilar y publicar APK
 #   MisionEnergiaTV.apk       juego en el tele, modo cooperativo con tablets
 #   MisionEnergiaControl.apk  app de las tablets de feria (Java, sin cambios)
 # y se publican en Releases. El QR (.../releases/latest/download/MisionEnergia.apk) no cambia.
-# Secretos: KEYSTORE_B64 (keystore en base64) y KS_PASS. Las tres APK llevan la misma firma.
+# Además arma MisionEnergia.aab para Google Play (mismo paquete y firma que el APK del celular,
+# sin compras con dinero real): queda como artefacto de la compilación, no en Releases.
+# Secretos: KEYSTORE_B64 (keystore en base64) y KS_PASS. Todo lleva la misma firma.
+# Opcional: PLAY_SERVICE_ACCOUNT_JSON (cuenta de servicio de Play Console) sube el AAB a la
+# prueba interna. La primera versión hay que subirla a mano desde Play Console.
 
 on:
   push:
@@ -26,6 +30,9 @@ env:
 jobs:
   apk:
     runs-on: ubuntu-24.04
+    env:
+      # Los secretos no se pueden leer en un `if`: se convierte a "true"/"false" acá.
+      HAS_PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -104,6 +111,16 @@ jobs:
           godot --headless --path . --export-release "Android Teléfono" build/MisionEnergia.apk
           test -s build/MisionEnergia.apk
 
+      - name: Exportar MisionEnergia.aab (Google Play, con Gradle)
+        env:
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ secrets.KS_PASS }}
+        run: |
+          # Plantilla sin agregados de TV: el AAB de Play es solo para celulares y tablets.
+          ./android/godot/prepare-tv-template.sh ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_source.zip --plain
+          cd godot
+          godot --headless --path . --export-release "Google Play" build/MisionEnergia.aab
+          test -s build/MisionEnergia.aab
+
       - name: Exportar MisionEnergiaTV.apk (tele, con Gradle)
         env:
           GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ secrets.KS_PASS }}
@@ -125,6 +142,8 @@ jobs:
         run: |
           mkdir -p dist
           cp godot/build/MisionEnergia.apk godot/build/MisionEnergiaTV.apk android/build/MisionEnergiaControl.apk dist/
+          # El AAB se firma como un .jar: misma huella que las APK.
+          keytool -printcert -jarfile godot/build/MisionEnergia.aab | grep -m1 "SHA256"
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           for f in dist/*.apk; do
             "$BT/apksigner" verify --print-certs "$f" | grep -m1 "SHA-256"
@@ -136,6 +155,22 @@ jobs:
         with:
           name: MisionEnergia-apks
           path: dist/*.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MisionEnergia-play-aab
+          path: godot/build/MisionEnergia.aab
+
+      - name: Subir el AAB a la prueba interna de Google Play
+        if: startsWith(github.ref, 'refs/tags/v') && env.HAS_PLAY_JSON == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ar.com.inkfusion.misionenergia
+          releaseFiles: godot/build/MisionEnergia.aab
+          track: internal
+          # Queda como borrador: se revisa y se publica desde Play Console.
+          status: draft
 
       - name: Publicar en Releases
         if: startsWith(github.ref, 'refs/tags/v')

@@ -1,7 +1,7 @@
 class_name SettingsScreen
 extends UiScreen
-## Ajustes: calidad gráfica, sonido, reinicio de progreso con confirmación escrita, versión y
-## créditos. Equivale a `SettingsScreen.ts` y `.set-*` de styles.ts: filas en tarjetas verdes,
+## Ajustes: calidad gráfica, sonido, velocidad del juego, tamaño de la interfaz, reinicio de
+## progreso con confirmación escrita, versión y créditos. Equivale a `SettingsScreen.ts` y `.set-*` de styles.ts: filas en tarjetas verdes,
 ## selector de calidad en píldora, interruptor de sonido y confirmación en rojo.
 
 const CONFIRM_WORD: String = "BORRAR"
@@ -12,6 +12,8 @@ const DANGER_ICON: Color = Color("#ff9c8f")
 var _deps: SettingsDeps
 var _quality: StringName
 var _q_buttons: Dictionary[StringName, Button] = {}
+var _speed_buttons: Dictionary[StringName, Button] = {}
+var _size_buttons: Dictionary[StringName, Button] = {}
 var _sound_btn: Button
 var _switch: Control
 var _knob_x: float = 0.0
@@ -22,25 +24,22 @@ func _init(deps: SettingsDeps) -> void:
 	_deps = deps
 	_quality = deps.quality
 
-	# `.seg`: píldora oscura con las tres opciones.
-	var seg_panel: PanelContainer = PanelContainer.new()
-	var seg_bg: StyleBoxFlat = UiTheme.box(Color(0, 0, 0, 0.3), 999)
-	seg_bg.set_content_margin_all(4)
-	seg_panel.add_theme_stylebox_override("panel", seg_bg)
-	seg_panel.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var seg: HBoxContainer = HBoxContainer.new()
-	seg.add_theme_constant_override("separation", 4)
-	for pair: Array in [[SettingsDeps.QUALITY_LOW, "Baja"], [SettingsDeps.QUALITY_MEDIUM, "Media"], [SettingsDeps.QUALITY_HIGH, "Alta"]]:
-		var q: StringName = pair[0]
-		var b: Button = Button.new()
-		b.text = pair[1]
-		b.custom_minimum_size = Vector2(72, 48)
-		b.add_theme_font_override("font", UiTheme.display(600))
-		b.add_theme_font_size_override("font_size", 17)
-		b.pressed.connect(_set_quality.bind(q))
-		_q_buttons[q] = b
-		seg.add_child(b)
-	seg_panel.add_child(seg)
+	var seg_panel: PanelContainer = _segment(
+		[[SettingsDeps.QUALITY_LOW, "Baja"], [SettingsDeps.QUALITY_MEDIUM, "Media"], [SettingsDeps.QUALITY_HIGH, "Alta"]],
+		_q_buttons, _set_quality)
+	var speed_pairs: Array = []
+	for v: int in GameSpeed.OPTIONS:
+		speed_pairs.append([StringName(str(v)), GameSpeed.label(v)])
+	var speed_panel: PanelContainer = _segment(speed_pairs, _speed_buttons, func(k: StringName) -> void:
+		_paint_segment(_speed_buttons, k)
+		if _deps.on_speed_change.is_valid():
+			_deps.on_speed_change.call(int(String(k))))
+	var size_panel: PanelContainer = _segment(
+		[[UiScale.SMALL, "Chica"], [UiScale.NORMAL, "Normal"], [UiScale.LARGE, "Grande"]],
+		_size_buttons, func(k: StringName) -> void:
+			_paint_segment(_size_buttons, k)
+			if _deps.on_ui_size_change.is_valid():
+				_deps.on_ui_size_change.call(k))
 
 	# `.switch`: 72×48 con riel y perilla que se desliza.
 	_sound_btn = Button.new()
@@ -66,20 +65,22 @@ func _init(deps: SettingsDeps) -> void:
 		about.add_child(l)
 	about_pad.add_child(about)
 
-	# `.set-list`: columna centrada de hasta 760 px.
+	# `.set-list`: columna centrada de hasta 760 px (más angosta si la pantalla no da).
 	var list: VBoxContainer = VBoxContainer.new()
 	list.add_theme_constant_override("separation", 10)
-	list.custom_minimum_size.x = LIST_W
-	list.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	list.add_child(_row(&"gear", "Calidad gráfica", "Si el juego va lento, probá con Baja.", seg_panel))
 	if deps.audio != null:
 		list.add_child(_row(&"sound", "Sonido", "Efectos y viento.", _sound_btn))
+	list.add_child(_row(&"bolt", "Velocidad del juego", "Acelera el día y la noche. Con Zonda o nubes vuelve a ×1.", speed_panel))
+	list.add_child(_row(&"search", "Tamaño de la interfaz", "Letras y botones más chicos o más grandes.", size_panel))
 	list.add_child(_reset_box)
 	list.add_child(about_pad)
 
-	var frame: PageFrame = UiCommon.page_frame({"title": "Ajustes", "on_back": deps.on_back, "body": [list]})
+	var frame: PageFrame = UiCommon.page_frame({"title": "Ajustes", "on_back": deps.on_back, "body": [UiCommon.max_width(list, LIST_W)]})
 	root = frame.root
 	_paint_quality()
+	_paint_segment(_speed_buttons, StringName(str(deps.speed)))
+	_paint_segment(_size_buttons, deps.ui_size)
 	_knob_x = 1.0 if _sound_on() else 0.0
 	_render_reset(false)
 
@@ -136,9 +137,37 @@ func _set_quality(q: StringName) -> void:
 
 
 func _paint_quality() -> void:
-	for q: StringName in _q_buttons.keys():
-		var b: Button = _q_buttons[q]
-		var on: bool = q == _quality
+	_paint_segment(_q_buttons, _quality)
+
+
+## `.seg`: píldora oscura con las opciones `pairs` ([clave, texto]); llena `buttons` y llama
+## `on_pick(clave)` al tocar.
+func _segment(pairs: Array, buttons: Dictionary[StringName, Button], on_pick: Callable) -> PanelContainer:
+	var seg_panel: PanelContainer = PanelContainer.new()
+	var seg_bg: StyleBoxFlat = UiTheme.box(Color(0, 0, 0, 0.3), 999)
+	seg_bg.set_content_margin_all(4)
+	seg_panel.add_theme_stylebox_override("panel", seg_bg)
+	seg_panel.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var seg: HBoxContainer = HBoxContainer.new()
+	seg.add_theme_constant_override("separation", 4)
+	for pair: Array in pairs:
+		var k: StringName = pair[0]
+		var b: Button = Button.new()
+		b.text = pair[1]
+		b.custom_minimum_size = Vector2(72, 48)
+		b.add_theme_font_override("font", UiTheme.display(600))
+		b.add_theme_font_size_override("font_size", 17)
+		b.pressed.connect(on_pick.bind(k))
+		buttons[k] = b
+		seg.add_child(b)
+	seg_panel.add_child(seg)
+	return seg_panel
+
+
+static func _paint_segment(buttons: Dictionary[StringName, Button], current: StringName) -> void:
+	for k: StringName in buttons.keys():
+		var b: Button = buttons[k]
+		var on: bool = k == current
 		UiTheme.style_button(b, UiTheme.box(UiTheme.SUN if on else Color.TRANSPARENT, 999))
 		for state: String in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
 			b.add_theme_color_override(state, UiTheme.INK if on else UiTheme.FG)

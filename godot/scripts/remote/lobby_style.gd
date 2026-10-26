@@ -1,9 +1,17 @@
 class_name LobbyStyle
 extends RefCounted
 ## Paleta, fuentes, cajas e íconos de la sala de espera del tele (misma estética que lobbyStyles.ts).
-## Medidas en unidades de la base 1280×720 (stretch canvas_items): U = 1% del alto.
+## Medidas en "vmin": `unit` = 1% del lado corto del área lógica. Con la UI agrandada del tele
+## (`UiScale`) el área lógica es más chica, así que `LobbyScreen` la recalcula antes de armar la
+## sala (si no, la sala se agrandaría dos veces y no entraría).
 
-const U: float = 7.2
+static var unit: float = 7.2
+
+
+## Toma el lado corto del área lógica actual (después de aplicar `UiScale`).
+static func measure(viewport: Viewport) -> void:
+	var r: Vector2 = viewport.get_visible_rect().size
+	unit = minf(r.x, r.y) / 100.0
 const SUN := Color("#FFB82E")
 const SUN_DARK := Color("#B9781A")
 const INK := Color("#10231F")
@@ -44,7 +52,7 @@ static func font(key: String) -> Font:
 
 
 static func px(units: float) -> int:
-	return int(roundf(units * U))
+	return int(roundf(units * unit))
 
 
 static func box(bg: Color, radius: float, border: Color = Color.TRANSPARENT, border_w: int = 0,

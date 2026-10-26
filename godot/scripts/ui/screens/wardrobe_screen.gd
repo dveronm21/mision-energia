@@ -34,6 +34,7 @@ func _init(deps: WardrobeDeps) -> void:
 
 	var grid: HBoxContainer = HBoxContainer.new()
 	grid.add_theme_constant_override("separation", 24)
+	grid.alignment = BoxContainer.ALIGNMENT_CENTER
 	grid.add_child(preview_col)
 	grid.add_child(options_col)
 

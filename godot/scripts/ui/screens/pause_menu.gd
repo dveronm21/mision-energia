@@ -17,6 +17,9 @@ var _exit_label: Label
 var _sound_btn: Button
 var _sound_icon: HudIcon
 var _sound_label: Label
+var _speed: int = 1
+var _speed_btn: Button
+var _speed_label: Label
 
 
 func _init(deps: PauseDeps) -> void:
@@ -62,13 +65,25 @@ func _init(deps: PauseDeps) -> void:
 	grid.add_child(_exit_btn)
 	col.add_child(grid)
 
+	# `.pm-sound`: botones de contorno oscuro (sonido y velocidad) a todo el ancho.
+	var opts: HBoxContainer = HBoxContainer.new()
+	opts.add_theme_constant_override("separation", 10)
 	if deps.audio != null:
-		# `.pm-sound`: botón de contorno oscuro a todo el ancho.
 		_sound_btn = UiCommon.action_button("Sonido: prendido", _toggle_sound, &"ghost_ink", &"sound")
+		_sound_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_sound_icon = _find_icon(_sound_btn)
 		_sound_label = _find_label(_sound_btn)
-		col.add_child(_sound_btn)
+		opts.add_child(_sound_btn)
 		_paint_sound()
+	if deps.on_speed_change.is_valid():
+		_speed = deps.speed
+		_speed_btn = UiCommon.action_button("Velocidad: ×4", _cycle_speed, &"ghost_ink", &"bolt")
+		_speed_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_speed_label = _find_label(_speed_btn)
+		_speed_label.text = "Velocidad: %s" % GameSpeed.label(_speed)
+		opts.add_child(_speed_btn)
+	if opts.get_child_count() > 0:
+		col.add_child(opts)
 
 
 func on_back() -> bool:
@@ -125,6 +140,12 @@ func _paint_sound() -> void:
 	_sound_icon.icon_name = &"mute" if muted else &"sound"
 	_sound_icon.queue_redraw()
 	_sound_label.text = "Sonido: apagado" if muted else "Sonido: prendido"
+
+
+func _cycle_speed() -> void:
+	_speed = GameSpeed.next(_speed)
+	_speed_label.text = "Velocidad: %s" % GameSpeed.label(_speed)
+	_deps.on_speed_change.call(_speed)
 
 
 static func _find_label(button: Button) -> Label:

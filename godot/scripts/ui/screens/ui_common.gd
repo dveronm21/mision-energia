@@ -115,6 +115,9 @@ static func modal_card(root: Control, width: float, pad: float = 22.0, separatio
 	card.name = "mdl-card"
 	card.add_theme_stylebox_override("panel", UiTheme.card(24, pad, 10))
 	card.custom_minimum_size = Vector2(width, 0)
+	# Pantalla angosta (teléfono con la UI agrandada): la tarjeta se achica y deja 16 px a cada lado.
+	center.resized.connect(func() -> void:
+		card.custom_minimum_size.x = minf(width, maxf(280.0, center.size.x - 32.0)))
 	var col: VBoxContainer = VBoxContainer.new()
 	col.add_theme_constant_override("separation", separation)
 	card.add_child(col)
@@ -145,6 +148,13 @@ static func pop_in(c: Control, from_scale: float = 0.9, sec: float = 0.34) -> vo
 		t.tween_property(c, "scale", Vector2.ONE, sec).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	# Diferido: recién después del primer acomodo la tarjeta tiene su tamaño (y su centro).
 	start.call_deferred()
+
+
+## Envuelve `c` en una columna centrada de hasta `width` px (ver `MaxWidth`).
+static func max_width(c: Control, width: float) -> MaxWidth:
+	var m: MaxWidth = MaxWidth.new(width)
+	m.add_child(c)
+	return m
 
 
 static func _margins(l: int, t: int, r: int, b: int) -> MarginContainer:

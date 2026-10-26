@@ -29,8 +29,8 @@ func _init() -> void:
 	var s := SphereMesh.new()
 	s.radius = 0.055
 	s.height = 0.11
-	s.radial_segments = 8
-	s.rings = 4
+	s.radial_segments = 16
+	s.rings = 8
 	multimesh.mesh = s
 	visible = false
 

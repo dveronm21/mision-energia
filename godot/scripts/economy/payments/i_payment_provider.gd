@@ -18,15 +18,21 @@ signal verify_finished(result: PaymentResult, ok: bool)
 const ID_DEMO: String = "demo"
 const ID_MERCADOPAGO: String = "mercadopago"
 const ID_GOOGLEPLAY: String = "googleplay"
+const ID_NONE: String = "none"
 
 
-## "demo" | "mercadopago" | "googleplay"
+## "demo" | "mercadopago" | "googleplay" | "none"
 func provider_id() -> String:
 	return ""
 
 
 func is_demo() -> bool:
 	return false
+
+
+## false = no se venden packs con dinero real (la tienda oculta la pestaña de Soles).
+func sells_real_money() -> bool:
+	return true
 
 
 func purchase(product: Product) -> PaymentResult:

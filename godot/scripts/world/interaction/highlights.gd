@@ -16,8 +16,9 @@ func _init() -> void:
 	var ring_mesh: TorusMesh = TorusMesh.new()
 	ring_mesh.inner_radius = 0.62
 	ring_mesh.outer_radius = 0.82
-	ring_mesh.rings = 4
-	ring_mesh.ring_segments = 40
+	# Tubo y vuelta redondos: con pocas caras el anillo y la flecha se veían como rombos.
+	ring_mesh.rings = 16
+	ring_mesh.ring_segments = 48
 
 	_ring = MeshInstance3D.new()
 	_ring.mesh = ring_mesh
@@ -35,7 +36,7 @@ func _init() -> void:
 	arrow_mesh.top_radius = 0.0
 	arrow_mesh.bottom_radius = 0.32
 	arrow_mesh.height = 0.7
-	arrow_mesh.radial_segments = 4
+	arrow_mesh.radial_segments = 24
 	_arrow = MeshInstance3D.new()
 	_arrow.mesh = arrow_mesh
 	_arrow.rotation.x = PI

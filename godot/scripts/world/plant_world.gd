@@ -9,6 +9,8 @@ extends Node3D
 const WIRE_ROW: Color = Color("#30383b")
 const WIRE_PROTECTION: Color = Color("#f28c28")
 const WIRE_PUMP: Color = Color("#55605d")
+## Alto del techo de la sala (modelo `canopy`) sobre el piso de la sala.
+const ROOF_TOP_Y: float = 3.45
 
 var level: LevelDefinition
 var layout: LevelLayout
@@ -111,6 +113,10 @@ func _build_room() -> void:
 	canopy.position = Vector3(r.slab.x, r.floor_y, r.wall_z + 0.8)
 	_add(canopy)
 	colliders.add(r.slab.x, r.wall_z - 0.15, r.slab.w / 2.0, 0.45)
+	# Cartel de EPSE parado sobre el borde de atrás del techo.
+	var logo: EpseLogoVisual = EpseLogoVisual.new(1.6)
+	logo.position = Vector3(r.slab.x, r.floor_y + ROOF_TOP_Y, r.wall_z - 0.1)
+	_add(logo)
 	_label("SALA DE EQUIPOS", r.label, 0.7)
 
 	# Luz de la sala: se enciende de noche con la energía de las baterías (siempre presente

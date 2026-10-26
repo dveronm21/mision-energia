@@ -3,7 +3,8 @@ extends Node
 ## Raíz de composición (equivale a `App.ts`). Usa los servicios del autoload `Services`, arma
 ## la UI y el HUD, y navega entre pantallas:
 ## Splash → Menú (regalo de bienvenida y bono diario) → Mapa → Taller → Partida → Resultado.
-## Tienda (con control parental), Vestuario (cosméticos del técnico) y Ajustes (calidad y sonido).
+## Tienda (con control parental), Vestuario (cosméticos del técnico) y Ajustes (calidad, sonido,
+## velocidad del juego y tamaño de la interfaz).
 ##
 ## Es el script de `scenes/Main.tscn`. El mundo 3D de la partida va en `world_host`; la UI,
 ## en una `CanvasLayer` encima.
@@ -29,6 +30,8 @@ var _ui_layer: CanvasLayer
 var _keyboard: KeyboardInput = KeyboardInput.new()
 var _run: LevelRun = null
 var _quality: StringName = &"medium"
+var _speed: int = 1
+var _ui_size: StringName = UiScale.NORMAL
 var _welcome_checked: bool = false
 ## Después de "Reiniciar progreso" el menú de abajo tiene los servicios viejos: al salir de
 ## Ajustes se arma de nuevo.
@@ -83,6 +86,10 @@ func _ready() -> void:
 	_quality = StringName(_services.store.load_value(QUALITY_KEY, "medium"))
 	if not QUALITY_INDEX.has(_quality):
 		_quality = &"medium"
+	_speed = GameSpeed.load_from(_services.store)
+	_ui_size = UiScale.load_size(_services.store)
+	_apply_ui_scale()
+	get_window().size_changed.connect(_apply_ui_scale)
 
 	show_splash()
 
@@ -266,6 +273,10 @@ func push_settings() -> void:
 	d.audio = _audio()
 	d.version = _version()
 	d.on_quality_change = _set_quality
+	d.speed = _speed
+	d.on_speed_change = _set_speed
+	d.ui_size = _ui_size
+	d.on_ui_size_change = _set_ui_size
 	d.on_reset_progress = _reset_progress
 	d.on_back = func() -> void:
 		if _menu_stale:
@@ -288,11 +299,30 @@ func _set_quality(q: StringName) -> void:
 		session.set_quality(QUALITY_INDEX[q])
 
 
-## Borra el progreso pero conserva la calidad y el sonido (igual que la web).
+func _set_speed(v: int) -> void:
+	_speed = v
+	GameSpeed.save_to(_s().store, v)
+	if session != null:
+		session.speed = v
+
+
+func _set_ui_size(v: StringName) -> void:
+	_ui_size = v
+	UiScale.save_size(_s().store, v)
+	_apply_ui_scale()
+
+
+func _apply_ui_scale() -> void:
+	UiScale.apply(get_window(), tv != null, _ui_size)
+
+
+## Borra el progreso pero conserva los ajustes (calidad, sonido, velocidad y tamaño), igual que la web.
 func _reset_progress() -> void:
 	var muted: bool = _audio().is_muted()
 	_services.reset_progress()
 	_s().store.save_value(QUALITY_KEY, String(_quality))
+	GameSpeed.save_to(_s().store, _speed)
+	UiScale.save_size(_s().store, _ui_size)
 	_audio().set_muted(muted)
 	_welcome_checked = false
 	_menu_stale = true
@@ -333,6 +363,7 @@ func start_level(run: LevelRun) -> void:
 	session = GameSession.new(d)
 	world_host.add_child(session.root)
 	session.set_quality(QUALITY_INDEX[_quality])
+	session.speed = _speed
 	if tv != null:
 		session.on_feedback = _on_session_feedback
 		for p: RemotePlayer in tv.players():
@@ -381,6 +412,8 @@ func pause() -> void:
 	var d: PauseDeps = PauseDeps.new()
 	d.audio = _audio()
 	d.level_name = ss.level().name
+	d.speed = _speed
+	d.on_speed_change = _set_speed
 	d.on_resume = _resume
 	d.on_restart = func() -> void:
 		if _run != null:
@@ -417,7 +450,10 @@ func _on_alert_resize(_height: float) -> void:
 func _place_toast() -> void:
 	var a: AlertBanner = hud.alert as AlertBanner
 	var t: Toast = ui.toast as Toast
-	t.root.offset_top = 12.0 + ((a.root.size.y + 8.0) if a.visible_now else 0.0)
+	var top: float = 12.0 + ((a.root.size.y + 8.0) if a.visible_now else 0.0)
+	# Se corre entero (arriba y abajo) con su alto justo: mover solo el borde de arriba lo estiraba.
+	t.root.offset_top = top
+	t.root.offset_bottom = top + t.root.get_combined_minimum_size().y
 
 
 # ================================================================== modo TV

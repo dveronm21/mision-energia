@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Prepara la plantilla Gradle de Godot para exportar "Misión Energía TV" (preset "Android TV").
 #
-#   ./android/godot/prepare-tv-template.sh <ruta a android_source.zip de Godot 4.7.2>
+#   ./android/godot/prepare-tv-template.sh <ruta a android_source.zip de Godot 4.7.2> [--plain]
+#
+# Con --plain instala la plantilla tal cual, sin nada de TV: es la que usa el AAB de Google
+# Play (preset "Google Play"), que no tiene que declararse como app de TV.
 #
 # Hace lo mismo que "Proyecto → Instalar plantilla de compilación de Android" (descomprime en
 # godot/android/build, escribe .build_version y .gdignore) y le agrega lo que el export de
@@ -23,6 +26,11 @@ unzip -q -o "$ZIP" -d "$B"
 echo "$VERSION_ID" > "$ROOT/.build_version"
 echo "" > "$B/.gdignore"
 chmod +x "$B/gradlew" 2>/dev/null || true
+
+if [ "${2:-}" = "--plain" ]; then
+  echo "Plantilla Gradle lista en $B (sin agregados de TV)"
+  exit 0
+fi
 
 M="$B/src/main/AndroidManifest.xml"
 [ -f "$M" ] || { echo "No está $M: ¿es el android_source.zip correcto?" >&2; exit 1; }

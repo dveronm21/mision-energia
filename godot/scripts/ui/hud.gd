@@ -18,6 +18,13 @@ var _inspect_real: InspectCard
 var _shedding_real: LoadSheddingPanel
 var _boosters_real: BoosterBar
 var _actions_real: ActionButtons
+var _bottom_lane: VBoxContainer
+var _fit_queued: bool = false
+
+## Debajo de este alto (teléfono con la UI agrandada) la misión se muestra compacta.
+const COMPACT_H: float = 560.0
+const LANE_MAX_W: float = 460.0
+const LANE_MIN_W: float = 300.0
 
 
 func _init(cb: HudCallbacks = HudCallbacks.new()) -> void:
@@ -124,6 +131,68 @@ func _init(cb: HudCallbacks = HudCallbacks.new()) -> void:
 		panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 
 	root.add_child(bottom_lane)
+	_bottom_lane = bottom_lane
+
+	# Los carriles centrales se recalculan con el tamaño de la pantalla y de los paneles de las
+	# puntas, para que en un teléfono la alerta y las fichas no tapen la misión, las
+	# estadísticas, el joystick ni la botonera.
+	root.resized.connect(_queue_fit)
+	_mission_real.root.resized.connect(_queue_fit)
+	_stats_real.root.resized.connect(_queue_fit)
+	_stats_real.root.visibility_changed.connect(_queue_fit)
+
+
+func _queue_fit() -> void:
+	if _fit_queued:
+		return
+	_fit_queued = true
+	_fit_lanes.call_deferred()
+
+
+func _fit_lanes() -> void:
+	_fit_queued = false
+	if not root.is_inside_tree():
+		return
+	_mission_real.set_compact(root.size.y < COMPACT_H)
+	var w: float = root.size.x
+
+	var left: float = 12.0
+	if _mission_real.root.is_visible_in_tree():
+		left = _local(_mission_real.root).end.x
+	var right: float = w - 12.0
+	for c: Control in [_stats_real.root, _actions_real.pause_button]:
+		if c.is_visible_in_tree():
+			right = minf(right, _local(c).position.x)
+	_place_lane(_alert_real.root, left, right)
+
+	left = 12.0
+	if joystick.is_visible_in_tree():
+		left = _local(joystick).end.x
+	right = w - 12.0
+	if _actions_real.root.is_visible_in_tree():
+		right = _local(_actions_real.root).position.x
+	var lane_w: float = _place_lane(_bottom_lane, left, right)
+	for panel: Control in [_shedding_real.root, _inspect_real.root]:
+		panel.custom_minimum_size.x = lane_w
+
+
+## Ubica un carril (anclado a la izquierda) en el hueco [left, right]: centrado en la pantalla
+## si entra, si no corrido dentro del hueco. Devuelve el ancho.
+func _place_lane(lane: Control, left: float, right: float) -> float:
+	var gap: float = 10.0
+	var w: float = clampf(right - left - 2.0 * gap, LANE_MIN_W, LANE_MAX_W)
+	var x: float = clampf((root.size.x - w) / 2.0, left + gap, maxf(left + gap, right - gap - w))
+	lane.anchor_left = 0.0
+	lane.anchor_right = 0.0
+	lane.offset_left = x
+	lane.offset_right = x + w
+	return w
+
+
+func _local(c: Control) -> Rect2:
+	var r: Rect2 = c.get_global_rect()
+	r.position -= root.get_global_rect().position
+	return r
 
 
 ## Modo TV: se juega desde las tablets, así que el tele no muestra joystick, botonera ni

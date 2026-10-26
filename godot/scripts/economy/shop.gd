@@ -41,6 +41,11 @@ func is_demo() -> bool:
 	return _payments.is_demo()
 
 
+## false si esta versión no vende packs con dinero real (Play Store sin Billing todavía).
+func sells_real_money() -> bool:
+	return _payments.sells_real_money()
+
+
 func is_credited(order_id: String) -> bool:
 	return _credited.has(order_id)
 

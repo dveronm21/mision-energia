@@ -3,10 +3,16 @@ extends UiScreen
 ## Tienda con pestañas. Packs con dinero real pasan por control parental → procesando →
 ## resultado. Equivale a `ShopScreen.ts`.
 
+const GRID_MAX_W: float = 1100.0
+## Debajo de este ancho las pestañas que no están elegidas muestran solo el ícono.
+const NARROW_W: float = 900.0
+
 var _deps: ShopDeps
 var _tab: StringName
 var _chip: WalletChip
 var _grid: GridContainer
+## Tarjetas de la pestaña actual: la grilla no tiene más columnas que tarjetas.
+var _card_count: int = 1
 var _sheet: Control
 var _tab_buttons: Dictionary[StringName, Button] = {}
 ## "" = no hay confirmación de compra abierta.
@@ -17,6 +23,8 @@ var _busy: bool = false
 func _init(deps: ShopDeps) -> void:
 	_deps = deps
 	_tab = deps.initial_tab
+	if _tab == ShopDeps.TAB_SOLES and not deps.shop.sells_real_money():
+		_tab = ShopDeps.TAB_MEJORAS
 	_chip = WalletChip.new(deps.wallet, deps.bus)
 
 	# `.tabs`: píldora oscura con borde; la pestaña elegida en sol.
@@ -29,12 +37,14 @@ func _init(deps: ShopDeps) -> void:
 	var tab_defs: Array[Array] = [[ShopDeps.TAB_SOLES, "Soles", &"sun"], [ShopDeps.TAB_MEJORAS, "Mejoras", &"bolt"], [ShopDeps.TAB_VESTUARIO, "Vestuario", &"helmet"]]
 	for pair: Array in tab_defs:
 		var id: StringName = pair[0]
+		if id == ShopDeps.TAB_SOLES and not deps.shop.sells_real_money():
+			continue
 		var b: Button = _tab_button(pair[1], pair[2], id)
 		_tab_buttons[id] = b
 		tabs.add_child(b)
 	tabs_panel.add_child(tabs)
 
-	# `.shop-grid`: columnas de al menos 220 px que llenan el ancho.
+	# `.shop-grid`: columnas de al menos 220 px que llenan una columna centrada de hasta 1100 px.
 	_grid = GridContainer.new()
 	_grid.columns = 4
 	_grid.add_theme_constant_override("h_separation", 12)
@@ -44,9 +54,9 @@ func _init(deps: ShopDeps) -> void:
 
 	var right: Array[Control] = [tabs_panel, _chip]
 	var body: Array[Control] = []
-	if _deps.shop.is_demo():
+	if _deps.shop.is_demo() and _deps.shop.sells_real_money():
 		body.append(_demo_banner())
-	body.append(_grid)
+	body.append(UiCommon.max_width(_grid, GRID_MAX_W))
 	var frame: PageFrame = UiCommon.page_frame({"title": "Tienda", "on_back": _back, "right": right, "body": body})
 	root = frame.root
 	# La ficha de pago tapa toda la página (`.sheet`), no ocupa lugar en la grilla.
@@ -55,10 +65,20 @@ func _init(deps: ShopDeps) -> void:
 	_sheet.visible = false
 	root.add_child(_sheet)
 	_set_tab(_tab)
+	root.resized.connect(_fit_tabs)
+
+
+func _fit_tabs() -> void:
+	var narrow: bool = root.size.x < NARROW_W
+	for id: StringName in _tab_buttons.keys():
+		var b: Button = _tab_buttons[id]
+		var show_text: bool = not narrow or id == _tab
+		(b.get_meta(&"label") as Label).visible = show_text
+		b.custom_minimum_size.x = float(b.get_meta(&"wide_w")) if show_text else 52.0
 
 
 func _fit_columns() -> void:
-	var cols: int = maxi(1, int((_grid.size.x + 12.0) / (220.0 + 12.0)))
+	var cols: int = clampi(int((_grid.size.x + 12.0) / (220.0 + 12.0)), 1, maxi(1, _card_count))
 	if cols != _grid.columns:
 		_grid.columns = cols
 
@@ -102,6 +122,9 @@ func _tab_button(label: String, icon_name: StringName, id: StringName) -> Button
 	t.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(t)
 	b.add_child(row)
+	b.set_meta(&"label", t)
+	b.set_meta(&"wide_w", b.custom_minimum_size.x)
+	b.tooltip_text = label
 	b.pressed.connect(_set_tab.bind(id))
 	return b
 
@@ -133,6 +156,8 @@ func _back() -> void:
 func _set_tab(t: StringName) -> void:
 	_tab = t
 	_confirming = ""
+	if root != null:
+		_fit_tabs()
 	for id: StringName in _tab_buttons.keys():
 		var b: Button = _tab_buttons[id]
 		var on: bool = id == t
@@ -167,6 +192,8 @@ func _render() -> void:
 	for c: Node in _grid.get_children():
 		c.queue_free()
 	var list: Array[Product] = _products()
+	_card_count = list.size()
+	_fit_columns()
 	if list.is_empty():
 		_grid.add_child(UiTheme.label("No hay productos en esta sección por ahora.", UiTheme.body(700), 16, UiTheme.MUTED))
 		return
@@ -282,8 +309,12 @@ func _card_footer(p: Product, owned: int, is_cos: bool, slot: StringName, equipp
 	var row: HBoxContainer = HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	if bal < cost:
-		row.add_child(UiCommon.action_button(UiFormat.fmt_int(cost), _set_tab.bind(ShopDeps.TAB_SOLES), &"ghost_ink", &"sun"))
-		var short: Label = UiTheme.label("Te faltan %s" % UiFormat.fmt_int(cost - bal), UiTheme.body(800), 12, UiTheme.INK_3)
+		var sells: bool = _deps.shop.sells_real_money()
+		row.add_child(UiCommon.action_button(UiFormat.fmt_int(cost), _set_tab.bind(ShopDeps.TAB_SOLES) if sells else Callable(), &"ghost_ink", &"sun"))
+		var missing: String = "Te faltan %s" % UiFormat.fmt_int(cost - bal)
+		var short: Label = UiTheme.label(missing if sells else missing + ": ganalos jugando", UiTheme.body(800), 12, UiTheme.INK_3)
+		short.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		short.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		short.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(short)
 	else:

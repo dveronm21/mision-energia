@@ -8,6 +8,16 @@ var _chip: WalletChip
 var _bonus_box: VBoxContainer
 var _bonus_panel: PanelContainer
 var _play: Button
+var _main: HBoxContainer
+var _hero: VBoxContainer
+var _actions: VBoxContainer
+var _logo: Control
+var _logo_k: float = 1.0
+
+const HERO_W: float = 440.0
+const ACTIONS_W: float = 480.0
+const GAP: float = 64.0
+const LOGO_SCALE: float = 0.82
 
 
 func _init(deps: MainMenuDeps) -> void:
@@ -35,6 +45,7 @@ func _init(deps: MainMenuDeps) -> void:
 
 	# `.mm-main`: héroe (logo + lema) y acciones, lado a lado y centrados.
 	var main: HBoxContainer = HBoxContainer.new()
+	_main = main
 	main.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	main.alignment = BoxContainer.ALIGNMENT_CENTER
 	main.add_theme_constant_override("separation", 64)
@@ -42,8 +53,10 @@ func _init(deps: MainMenuDeps) -> void:
 	var hero: VBoxContainer = VBoxContainer.new()
 	hero.alignment = BoxContainer.ALIGNMENT_CENTER
 	hero.add_theme_constant_override("separation", 16)
-	hero.custom_minimum_size.x = 440
-	hero.add_child(Logo.build(0.82))
+	hero.custom_minimum_size.x = HERO_W
+	_hero = hero
+	_logo = Logo.build(LOGO_SCALE)
+	hero.add_child(_logo)
 	var tag: Label = UiTheme.label("Construí una planta solar híbrida y mantené la ciudad encendida cuando se oculta el sol.",
 		UiTheme.body(700), 20, UiTheme.MUTED)
 	tag.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -53,7 +66,8 @@ func _init(deps: MainMenuDeps) -> void:
 	var actions: VBoxContainer = VBoxContainer.new()
 	actions.alignment = BoxContainer.ALIGNMENT_CENTER
 	actions.add_theme_constant_override("separation", 14)
-	actions.custom_minimum_size.x = 480
+	actions.custom_minimum_size.x = ACTIONS_W
+	_actions = actions
 
 	_play = UiCommon.action_button("Jugar", deps.on_play, &"primary", &"play", true)
 	_play.custom_minimum_size.y = 80
@@ -81,6 +95,23 @@ func _init(deps: MainMenuDeps) -> void:
 
 	root.add_child(col)
 	_render_bonus()
+	root.resized.connect(_fit)
+
+
+## Pantalla angosta (teléfono 16:9 con la UI agrandada): héroe, acciones, separación y logo se
+## achican juntos para que todo entre a lo ancho.
+func _fit() -> void:
+	var k: float = clampf((root.size.x - 48.0) / (HERO_W + GAP + ACTIONS_W), 0.6, 1.0)
+	_hero.custom_minimum_size.x = HERO_W * k
+	_actions.custom_minimum_size.x = ACTIONS_W * k
+	_main.add_theme_constant_override("separation", int(GAP * k))
+	if absf(k - _logo_k) > 0.02:
+		_logo_k = k
+		var fresh: Control = Logo.build(LOGO_SCALE * k)
+		_hero.add_child(fresh)
+		_hero.move_child(fresh, _logo.get_index())
+		_logo.queue_free()
+		_logo = fresh
 
 
 ## `.mm-tile`: tarjeta verde oscura con ícono amarillo y nombre en Fredoka.

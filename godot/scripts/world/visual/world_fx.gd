@@ -2,8 +2,8 @@ class_name WorldFx
 extends RefCounted
 ## Efectos de partículas 3D de un solo disparo: chispas al conectar un cable, polvo al apoyar
 ## un equipo y destellos al activar la planta o completar el campo solar. `CPUParticles3D`
-## (anda igual en GL Compatibility que en los renderers modernos) con cuadraditos sin luz que
-## miran a la cámara; cada ráfaga se borra sola al terminar.
+## (anda igual en GL Compatibility que en los renderers modernos) con puntitos redondos sin luz
+## que miran a la cámara; cada ráfaga se borra sola al terminar.
 ##
 ##   WorldFx.sparks(world, terminal)      # en coordenadas locales de `world`
 
@@ -27,10 +27,26 @@ static func _material() -> StandardMaterial3D:
 		_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		_mat.vertex_color_use_as_albedo = true
 		_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		_mat.albedo_texture = _dot_texture()
 	return _mat
 
 
-## Igual que `_material()` pero con la textura de estrellita (si no se encuentra, cuadradito).
+## Punto redondo de borde suave (blanco; el color lo pone cada partícula).
+static func _dot_texture() -> GradientTexture2D:
+	var g: Gradient = Gradient.new()
+	g.colors = PackedColorArray([Color.WHITE, Color.WHITE, Color(1, 1, 1, 0)])
+	g.offsets = PackedFloat32Array([0.0, 0.7, 1.0])
+	var t: GradientTexture2D = GradientTexture2D.new()
+	t.gradient = g
+	t.fill = GradientTexture2D.FILL_RADIAL
+	t.fill_from = Vector2(0.5, 0.5)
+	t.fill_to = Vector2(1.0, 0.5)
+	t.width = 32
+	t.height = 32
+	return t
+
+
+## Igual que `_material()` pero con la textura de estrellita (si no se encuentra, puntito).
 static func _star_material() -> StandardMaterial3D:
 	if _star_mat == null:
 		_star_mat = _material().duplicate() as StandardMaterial3D

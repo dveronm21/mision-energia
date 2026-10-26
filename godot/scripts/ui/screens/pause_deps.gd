@@ -5,6 +5,10 @@ extends RefCounted
 ## null = sin botón de sonido.
 var audio: AudioSynth
 var level_name: String = ""
+## Velocidad del reloj (`GameSpeed.OPTIONS`); `on_speed_change` vacío = sin botón.
+var speed: int = 1
+## Callable(v: int) -> void.
+var on_speed_change: Callable
 ## Callable() -> void, cada uno.
 var on_resume: Callable
 var on_restart: Callable

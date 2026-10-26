@@ -155,3 +155,55 @@ static func _find_pickup(s: GameSession, kind: StringName) -> Pickup:
 		if p.kind == kind:
 			return p
 	return null
+
+
+## Arma y activa la planta de "casa" (4 paneles, protección, batería y los 3 cables).
+static func _build_casa(s: GameSession) -> void:
+	for i: int in 4:
+		s.take_from_pallet()
+		s.install_panel(s.world().mounts[i])
+	s.take_pickup(_find_pickup(s, &"protection"))
+	s.install_protection()
+	s.take_pickup(_find_pickup(s, &"battery"))
+	s.install_battery(0)
+	s.take_cable(CableNetwork.COLOR_ORANGE, &"junction", s.world().junction.terminal)
+	s.connect_cable(&"protection")
+	s.take_cable(CableNetwork.COLOR_BLUE, &"battery", s.world().batteries[0].terminal)
+	s.connect_cable(&"inverter")
+	s.take_cable(CableNetwork.COLOR_VIOLET, &"switchboard", s.world().switchboard.terminal)
+	s.connect_cable(&"inverter")
+	s.try_activate()
+
+
+func test_game_session_velocidad_salvo_clima() -> void:
+	var level: LevelDefinition = Levels.casa()
+	# Nubes de 11 a 12 y Zonda a las 15 (con su alerta antes).
+	level.events = LevelEvents.make(false, 15.0, [CloudBand.make(11, 12, 0.5)] as Array[CloudBand])
+	var s: GameSession = GameSession.new(_deps(level, Purchase.make(4, 1, false)))
+	s.speed = 4
+	check_eq(s.effective_speed(), 1, "en obra el reloj no corre: velocidad ×1")
+	_build_casa(s)
+	check_eq(s.phase(), SessionPort.PHASE_RUNNING, "la planta corre")
+
+	s._hour = 10.5
+	check_eq(s.effective_speed(), 4, "con tiempo tranquilo corre a ×4")
+	var h0: float = s.game_hour()
+	s.update(0.05, Vector2.ZERO)
+	var fast: float = s.game_hour() - h0
+	s.speed = 1
+	s._hour = 10.5
+	s.update(0.05, Vector2.ZERO)
+	var slow: float = s.game_hour() - 10.5
+	check(fast > slow * 3.5, "×4 avanza unas 4 veces más rápido que ×1 (%.4f contra %.4f)" % [fast, slow])
+
+	s.speed = 4
+	s._hour = 11.5
+	check_eq(s.effective_speed(), 1, "con nubes vuelve a ×1")
+	var zw: ZondaWindow = WeatherSchedule.new(level.events).zonda_window()
+	s._hour = (zw.warn_from + zw.storm_from) / 2.0
+	check_eq(s.effective_speed(), 1, "con alerta de Zonda vuelve a ×1")
+	s._hour = (zw.storm_from + zw.storm_to) / 2.0
+	check_eq(s.effective_speed(), 1, "con tormenta de Zonda vuelve a ×1")
+	s._hour = zw.storm_to + 0.5
+	check_eq(s.effective_speed(), 4, "pasado el Zonda vuelve a ×4")
+	s.dispose()

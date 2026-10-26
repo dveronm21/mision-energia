@@ -34,7 +34,7 @@ func _build(new_store: SaveStore) -> void:
 	wallet = Wallet.new(store, bus)
 	inventory = Inventory.new(store)
 	catalog = Catalog.new()
-	shop = Shop.new(catalog, wallet, inventory, DemoPaymentProvider.new(), store, bus)
+	shop = Shop.new(catalog, wallet, inventory, payment_provider(), store, bus)
 	rewards = RewardService.new(wallet, store)
 	levels = LevelCatalog.new()
 	progress = LevelManager.new(levels, store, wallet)
@@ -46,6 +46,14 @@ func _build(new_store: SaveStore) -> void:
 		add_child(audio)
 	else:
 		audio.setup(store)
+
+
+## Versión de Play Store (característica de exportación `play`): sin compras con dinero real
+## hasta integrar Google Play Billing. APK de la feria y desarrollo: pagos simulados.
+static func payment_provider() -> IPaymentProvider:
+	if OS.has_feature("play"):
+		return NoPaymentProvider.new()
+	return DemoPaymentProvider.new()
 
 
 ## Borra todo el progreso guardado y reconstruye los servicios desde cero. El audio

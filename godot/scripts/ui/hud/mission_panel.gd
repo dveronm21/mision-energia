@@ -4,6 +4,8 @@ extends MissionPanelPort
 ## `.hud-mission` de styles.ts: título Fredoka, cronómetro, flecha para plegar y la lista de
 ## objetivos con un punto por estado (hecho = verde lleno, actual = aro de sol con halo,
 ## alerta = naranja, pendiente = aro gris).
+## Compacto (pantallas bajas, como un teléfono): solo "N de M hechos", el paso actual y el
+## siguiente, para no tapar el joystick.
 
 const WIDTH: float = 300.0
 const ALERT_TEXT: Color = Color("#ffd27a")
@@ -18,6 +20,8 @@ var _chevron: HudIcon
 var _list: VBoxContainer
 var _collapsed: bool = false
 var _last_key: String = ""
+var _objectives: Array[MissionObjective] = []
+var _compact: bool = false
 ## Callable(collapsed: bool) -> void, opcional.
 var on_toggle: Callable
 
@@ -92,8 +96,17 @@ func set_timer_visible(on: bool) -> void:
 	_timer.visible = on
 
 
+func set_compact(on: bool) -> void:
+	if on == _compact:
+		return
+	_compact = on
+	_last_key = ""
+	set_objectives(_objectives)
+
+
 func set_objectives(objectives: Array[MissionObjective]) -> void:
-	var parts: PackedStringArray = PackedStringArray()
+	_objectives = objectives
+	var parts: PackedStringArray = PackedStringArray([str(_compact)])
 	for it: MissionObjective in objectives:
 		parts.append("%s|%s" % [it.state, it.text])
 	var key: String = "\n".join(parts)
@@ -108,12 +121,40 @@ func set_objectives(objectives: Array[MissionObjective]) -> void:
 	for c: Node in _list.get_children():
 		_list.remove_child(c)
 		c.queue_free()
-	for it: MissionObjective in objectives:
+	var shown: Array[MissionObjective] = _visible_items(objectives)
+	if shown.size() < objectives.size():
+		var done: int = 0
+		for it: MissionObjective in objectives:
+			if it.state == MissionObjective.STATE_OK:
+				done += 1
+		if done > 0:
+			_list.add_child(UiTheme.label("✓ %d de %d hechos" % [done, objectives.size()], UiTheme.body(800), 13, UiTheme.LEAF))
+	for it: MissionObjective in shown:
 		var row: Control = _build_item(it)
 		_list.add_child(row)
 		# Un objetivo recién cumplido destella (premio visual inmediato).
 		if had_items and it.state == MissionObjective.STATE_OK and not previously_ok.has("%s|%s" % [it.state, it.text]):
 			_flash(row)
+
+
+## Compacto: los dos primeros pasos sin hacer (el actual y el siguiente), más las alertas que
+## aparezcan antes; si no queda nada, el último hecho.
+func _visible_items(objectives: Array[MissionObjective]) -> Array[MissionObjective]:
+	if not _compact:
+		return objectives
+	var out: Array[MissionObjective] = []
+	var pending: int = 0
+	for it: MissionObjective in objectives:
+		if it.state == MissionObjective.STATE_OK:
+			continue
+		out.append(it)
+		if it.state != MissionObjective.STATE_ALERT:
+			pending += 1
+			if pending >= 2:
+				break
+	if out.is_empty() and not objectives.is_empty():
+		out.append(objectives[objectives.size() - 1])
+	return out
 
 
 static func _flash(row: Control) -> void:

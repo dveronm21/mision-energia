@@ -29,6 +29,8 @@ var cam_rig: CameraRig
 var paused: bool = false
 ## Multiplicador del reloj de juego (depuración).
 var time_scale: float = 1.0
+## Velocidad elegida por el jugador (`GameSpeed`): solo corre con tiempo tranquilo.
+var speed: int = 1
 var connector: ConnectorFacts = ConnectorFacts.new()
 
 var _d: SessionDeps
@@ -690,7 +692,8 @@ func _step_sim(dt: float) -> void:
 	var phase: String = _weather_schedule.phase_at(_hour)
 	if phase != _weather:
 		_on_weather(phase)
-	var hps: float = (CLOCK_SLOW if (phase == WeatherSchedule.ZONDA_WARNING or phase == WeatherSchedule.ZONDA_STORM) else CLOCK_NORMAL) * time_scale
+	var zonda: bool = phase == WeatherSchedule.ZONDA_WARNING or phase == WeatherSchedule.ZONDA_STORM
+	var hps: float = (CLOCK_SLOW if zonda else CLOCK_NORMAL) * time_scale * effective_speed()
 	var snap: SimSnapshot = _sim.step(dt * hps, plant_state(), phase)
 	_snap = snap
 	_hour = snap.hour
@@ -776,6 +779,19 @@ func _launch_drone() -> void:
 		return
 	w.drone.start(rows)
 	toast("Pasó el Zonda. ¡El dron limpiador ya salió a limpiar los paneles!", &"good")
+
+
+## Velocidad que corre ahora: la elegida, salvo con Zonda (alerta o tormenta) o nubes, que
+## vuelven a ×1 para dar tiempo a defender y a cuidar la batería.
+func effective_speed() -> int:
+	if speed <= 1 or _phase != PHASE_RUNNING:
+		return 1
+	var phase: String = _weather_schedule.phase_at(_hour)
+	if phase == WeatherSchedule.ZONDA_WARNING or phase == WeatherSchedule.ZONDA_STORM:
+		return 1
+	if _weather_schedule.cloudiness_at(_hour) > 0.0:
+		return 1
+	return speed
 
 
 func _warning_seconds() -> float:

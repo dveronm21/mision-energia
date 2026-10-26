@@ -9,6 +9,9 @@ var view: LobbyView
 
 ## `on_start`/`on_back`: Callable() -> void.
 func _init(host: RemoteHost, on_start: Callable, on_back: Callable) -> void:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree != null:
+		LobbyStyle.measure(tree.root)
 	view = LobbyView.new()
 	view.name = "lobby"
 	view.setup(host)

@@ -51,9 +51,10 @@ func show(text: String, kind: StringName = &"info", ms: int = 2600) -> void:
 	var wraps: bool = w > 460.0
 	_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if wraps else TextServer.AUTOWRAP_OFF
 	_label.custom_minimum_size.x = 460.0 if wraps else 0.0
-	root.reset_size()
-	root.offset_left = -root.get_combined_minimum_size().x / 2.0
-	root.offset_right = -root.offset_left
+	_fit()
+	# Otra vez después del acomodo: el alto del texto partido en renglones se conoce recién ahí,
+	# y un `Control` no se achica solo (sin esto la tarjeta quedaba altísima).
+	_fit.call_deferred()
 	var bg: Color = BG_INFO
 	match kind:
 		&"good":
@@ -65,6 +66,14 @@ func show(text: String, kind: StringName = &"info", ms: int = 2600) -> void:
 	if root.is_inside_tree():
 		_timer.start(ms / 1000.0)
 		_pop_in()
+
+
+func _fit() -> void:
+	var m: Vector2 = root.get_combined_minimum_size()
+	root.offset_left = -m.x / 2.0
+	root.offset_right = m.x / 2.0
+	root.offset_bottom = root.offset_top + m.y
+	root.size = m
 
 
 ## `@keyframes toastIn`: entra desde 8 px más arriba y transparente, con un rebote corto.

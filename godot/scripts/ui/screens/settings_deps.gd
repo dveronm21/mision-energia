@@ -8,6 +8,14 @@ const QUALITY_HIGH: StringName = &"high"
 
 ## "low" | "medium" | "high".
 var quality: StringName = QUALITY_MEDIUM
+## Velocidad del reloj (`GameSpeed.OPTIONS`).
+var speed: int = 1
+## Callable(v: int) -> void.
+var on_speed_change: Callable
+## Tamaño de la interfaz (`UiScale.SMALL` | `NORMAL` | `LARGE`).
+var ui_size: StringName = UiScale.NORMAL
+## Callable(v: StringName) -> void.
+var on_ui_size_change: Callable
 ## null = sin control de sonido.
 var audio: AudioSynth
 var version: String = ""
