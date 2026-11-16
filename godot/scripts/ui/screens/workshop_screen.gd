@@ -34,7 +34,8 @@ func _init(deps: WorkshopDeps) -> void:
 	if deps.initial != null:
 		_p = deps.initial.clone()
 	else:
-		_p = Purchase.make(mini(max_panels, _lv.min_panels), mini(1, _lv.battery_slots), false)
+		var panels: int = _lv.default_panels if _lv.default_panels > 0 else _lv.min_panels
+		_p = Purchase.make(mini(max_panels, panels), mini(1, _lv.battery_slots), false)
 	_chip = WalletChip.new(deps.wallet, deps.bus, deps.on_shop) if deps.wallet != null else null
 
 	var story: VBoxContainer = _build_story(max_panels)

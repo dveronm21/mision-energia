@@ -46,6 +46,12 @@ static func casa() -> LevelDefinition:
 	l.three_star_spend = 0.9
 	l.requires = ""
 	l.unlock_cost_soles = 0
+	# Primera obra: el taller ya trae la fila completa y a veces se larga el Zonda a la siesta
+	# (con o sin defensa se gana igual: sirve para conocerlo).
+	l.default_panels = 4
+	l.random_zonda_chance = 0.5
+	l.random_zonda_from = 13.0
+	l.random_zonda_to = 15.0
 	return l
 
 

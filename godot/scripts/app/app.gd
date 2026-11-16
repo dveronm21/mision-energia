@@ -29,6 +29,8 @@ var _services: AppServices
 var _ui_layer: CanvasLayer
 var _keyboard: KeyboardInput = KeyboardInput.new()
 var _run: LevelRun = null
+## Sorteo del clima de cada partida (Zonda al azar en los niveles que lo permiten).
+var _weather_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _quality: StringName = &"medium"
 var _speed: int = 1
 var _fps: StringName = FrameRate.AUTO
@@ -224,7 +226,7 @@ func show_map() -> void:
 
 func push_workshop(id: String, initial: Purchase = null) -> void:
 	var s: AppServices = _s()
-	var level: LevelDefinition = s.levels.get_level(id)
+	var level: LevelDefinition = s.levels.get_level(id).roll_weather(_weather_rng)
 	var d: WorkshopDeps = WorkshopDeps.new()
 	d.level = level
 	d.boosters_catalog = s.catalog.by_kind(Product.KIND_BOOSTER)
@@ -238,7 +240,7 @@ func push_workshop(id: String, initial: Purchase = null) -> void:
 		for b: String in ids:
 			if BOOSTER_IDS.has(b) and _s().boosters.use(b):
 				used.append(StringName(b))
-		start_level(LevelRun.make(id, purchase, used))
+		start_level(LevelRun.make(id, purchase, used, level))
 	d.on_back = _pop
 	d.on_shop = func() -> void: push_shop(ShopDeps.TAB_MEJORAS)
 	ui.screens.push(WorkshopScreen.new(d))
@@ -359,7 +361,7 @@ func start_level(run: LevelRun) -> void:
 	_end_session()
 	_run = run
 	var s: AppServices = _s()
-	var level: LevelDefinition = s.levels.get_level(run.level_id)
+	var level: LevelDefinition = run.level if run.level != null else s.levels.get_level(run.level_id)
 	var d: SessionDeps = SessionDeps.new()
 	d.level = level
 	d.purchase = run.purchase

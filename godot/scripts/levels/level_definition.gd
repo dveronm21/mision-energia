@@ -52,6 +52,14 @@ var three_star_spend: float = 1.0
 var requires: String = ""
 ## Desbloqueo anticipado pagando Soles.
 var unlock_cost_soles: int = 0
+## Paneles que el taller trae elegidos al entrar (0 = `min_panels`).
+var default_panels: int = 0
+## Probabilidad de que una partida traiga Zonda aunque el nivel no lo tenga fijo, y entre qué
+## horas puede llegar (ver `roll_weather`). La definición en sí no cambia: el balance y los
+## golden siguen viendo el nivel sin Zonda.
+var random_zonda_chance: float = 0.0
+var random_zonda_from: float = 13.0
+var random_zonda_to: float = 15.0
 
 
 func max_panels() -> int:
@@ -97,4 +105,20 @@ func clone() -> LevelDefinition:
 	l.three_star_spend = three_star_spend
 	l.requires = requires
 	l.unlock_cost_soles = unlock_cost_soles
+	l.default_panels = default_panels
+	l.random_zonda_chance = random_zonda_chance
+	l.random_zonda_from = random_zonda_from
+	l.random_zonda_to = random_zonda_to
+	return l
+
+
+## Clima de esta partida: con `random_zonda_chance` sortea si viene Zonda y a qué hora (cada
+## cuarto de hora). Devuelve una copia si cambió algo; si no, el mismo nivel.
+func roll_weather(rng: RandomNumberGenerator) -> LevelDefinition:
+	if random_zonda_chance <= 0.0 or events.has_zonda():
+		return self
+	if rng.randf() >= random_zonda_chance:
+		return self
+	var l: LevelDefinition = clone()
+	l.events.zonda_at_hour = snappedf(rng.randf_range(random_zonda_from, random_zonda_to), 0.25)
 	return l

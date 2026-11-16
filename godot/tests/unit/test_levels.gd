@@ -78,3 +78,33 @@ func test_desbloqueo_con_soles() -> void:
 	check_eq(lm.unlock_with_soles("finca"), true, "ya abierta")
 	check_eq(wallet.balance(), 5, "no cobra dos veces")
 	check(LevelManager.new(catalog, store, wallet).is_unlocked("finca"), "persistido")
+
+
+func test_casa_trae_cuatro_paneles_y_zonda_al_azar() -> void:
+	var casa: LevelDefinition = Levels.casa()
+	check_eq(casa.default_panels, 4, "el taller trae la fila completa")
+	check(not casa.events.has_zonda(), "la definición sigue sin Zonda (balance y golden)")
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng.seed = 1234
+	var with_zonda: int = 0
+	for _i: int in 400:
+		var l: LevelDefinition = casa.roll_weather(rng)
+		if l.events.has_zonda():
+			with_zonda += 1
+			check(l != casa, "el Zonda va en una copia")
+			var h: float = l.events.zonda_at_hour
+			check(h >= 13.0 and h <= 15.0, "llega a la siesta (%.2f)" % h)
+			check_near(fmod(h * 4.0, 1.0), 0.0, 1e-6, "en cuartos de hora")
+		else:
+			check(l == casa, "sin Zonda devuelve el mismo nivel")
+	check(with_zonda > 150 and with_zonda < 250, "más o menos la mitad de las partidas (%d/400)" % with_zonda)
+	check(not casa.events.has_zonda(), "sortear no toca la definición")
+
+
+func test_niveles_con_zonda_fijo_no_se_sortean() -> void:
+	var finca: LevelDefinition = Levels.finca()
+	finca.random_zonda_chance = 1.0
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	check(finca.roll_weather(rng) == finca, "con Zonda fijo no cambia")
+	var esc: LevelDefinition = Levels.escuela()
+	check(esc.roll_weather(rng) == esc, "escuela no sortea Zonda")
