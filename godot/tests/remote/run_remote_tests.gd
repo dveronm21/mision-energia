@@ -14,6 +14,7 @@ var _checks: int = 0
 func _init() -> void:
 	var cases: Array[Array] = [
 		["RemoteHost: sin puente queda inactivo y no rompe", t_inactive],
+		["TvMode: players() saltea los asientos libres (una sola tablet)", t_tv_players],
 		["RemoteHost: asigna asientos 0 y 1, colores y token; el tercero recibe full", t_seats],
 		["RemoteHost: reconexión con token dentro de la ventana recupera el asiento", t_resume],
 		["RemoteHost: fuera de la ventana el asiento se libera y el token ya no sirve", t_expired],
@@ -130,6 +131,20 @@ func t_inactive() -> void:
 	host.toast(0, "hola")
 	ok(host.players()[0] == null and host.players()[1] == null, "sin jugadores")
 	eq(host.input(0).read().connected, false, "connected")
+
+
+func t_tv_players() -> void:
+	var s := setup()
+	var tv := TvMode.new()
+	tv.host = s.host
+	eq(tv.players().size(), 0, "sin tablets")
+	var a := s.bridge.connect_client(); a.hello("Ana")
+	s.host.update()
+	var ps: Array[RemotePlayer] = tv.players()
+	eq(ps.size(), 1, "una tablet")
+	eq(ps[0].name if ps.size() == 1 else "", "Ana", "nombre")
+	tv.host = null
+	tv.free()
 
 
 func t_seats() -> void:

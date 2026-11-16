@@ -68,7 +68,13 @@ func intent(slot: int) -> PlayerIntent:
 
 ## Jugadores con asiento (conectados o con el asiento reservado), ordenados por asiento.
 func players() -> Array[RemotePlayer]:
-	var out: Array[RemotePlayer] = host.players() if host != null else [] as Array[RemotePlayer]
+	var out: Array[RemotePlayer] = []
+	if host != null:
+		# `host.players()` trae null en los asientos libres: con menos de 2 tablets, "Construir"
+		# se rompía al sumar los técnicos y el nivel no arrancaba.
+		for p: RemotePlayer in host.players():
+			if p != null:
+				out.append(p)
 	out.sort_custom(func(a: RemotePlayer, b: RemotePlayer) -> bool: return a.slot < b.slot)
 	return out
 
