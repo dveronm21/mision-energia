@@ -141,3 +141,18 @@ func _cleanup() -> void:
 		return
 	for f: String in dir.get_files():
 		dir.remove(f)
+
+
+func test_frame_rate_guarda_y_aplica_el_tope() -> void:
+	var store: SaveStore = SaveStore.in_memory()
+	check_eq(FrameRate.load_from(store), FrameRate.AUTO, "sin dato guardado: Auto")
+	FrameRate.save_to(store, FrameRate.FPS_60)
+	check_eq(FrameRate.load_from(store), FrameRate.FPS_60, "guarda 60")
+	store.save_value(FrameRate.KEY, "144")
+	check_eq(FrameRate.load_from(store), FrameRate.AUTO, "un valor raro vuelve a Auto")
+	check_eq(FrameRate.max_fps(FrameRate.AUTO), 0, "Auto: sin tope")
+	check_eq(FrameRate.max_fps(FrameRate.FPS_60), 60, "60: tope de 60")
+	var before: int = Engine.max_fps
+	FrameRate.apply(FrameRate.FPS_60)
+	check_eq(Engine.max_fps, 60, "aplica el tope al motor")
+	Engine.max_fps = before

@@ -12,6 +12,10 @@ var quality: StringName = QUALITY_MEDIUM
 var speed: int = 1
 ## Callable(v: int) -> void.
 var on_speed_change: Callable
+## Tope de cuadros por segundo (`FrameRate.OPTIONS`).
+var fps: StringName = FrameRate.AUTO
+## Callable(v: StringName) -> void.
+var on_fps_change: Callable
 ## Tamaño de la interfaz (`UiScale.SMALL` | `NORMAL` | `LARGE`).
 var ui_size: StringName = UiScale.NORMAL
 ## Callable(v: StringName) -> void.

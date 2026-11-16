@@ -22,6 +22,9 @@ const LOGICAL_PX_PER_INCH: float = 157.0
 ## Con la base de 1280×720, cualquier tele queda en 1067×600 lógicos: el texto de 16 se ve de
 ## ~29 px reales en 1080p (pauta de lectura a 3 m) y entran la misión entera y la sala de espera.
 const TV_FACTOR: float = 1.2
+## Debajo de este alto lógico (teléfono apaisado: ~430) las páginas se arman compactas
+## (`is_short`). Mismo umbral que la misión compacta del HUD.
+const SHORT_H: float = 560.0
 
 ## > 0: usa este factor en vez de medir la pantalla (capturas en la compu).
 static var forced_factor: float = 0.0
@@ -55,6 +58,12 @@ static func auto_factor(tv: bool) -> float:
 	# 4:3 (ahí manda el ancho de 1280).
 	var base_scale: float = minf(long_px / 1280.0, short_px / BASE_H)
 	return maxf(1.0, (short_px / base_scale) / wanted)
+
+
+## true si el alto lógico de la ventana es de teléfono: encabezados, pies y tarjetas más finos.
+static func is_short() -> bool:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	return tree != null and tree.root.get_visible_rect().size.y < SHORT_H
 
 
 ## Con "Grande" en un teléfono el alto lógico no baja de `MIN_GRANDE_H` (si no, el HUD no entra).

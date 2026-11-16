@@ -956,7 +956,11 @@ func _finish(s: SimSnapshot) -> void:
 func _result() -> LevelResult:
 	var s: SimSnapshot = _snap if _snap != null else _sim.snapshot()
 	var plant: PlantState = plant_state()
-	var night_loads: Array[String] = _night_loads if _night_loads != null else []
+	# Si el apagón llega antes de la noche, `_night_loads` sigue en null. Un `[]` sin tipo en un
+	# ternario no se puede asignar a Array[String]: `_result()` devolvía null y en Android se cerraba.
+	var night_loads: Array[String] = []
+	if _night_loads != null:
+		night_loads = _night_loads
 	var input: ScoringInput = ScoringInput.new()
 	input.won = s.won
 	input.final_soc_pct = s.soc_pct

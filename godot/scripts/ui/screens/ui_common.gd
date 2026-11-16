@@ -16,8 +16,10 @@ const DISABLED_LIP: Color = Color("#a9b5b1")
 ## "back_label":String="Volver", "right":Array[Control]=[], "body":Array[Control],
 ## "footer":Array[Control]=[], "cls":String=""}.
 ## Igual que `.pg` de la web: fondo con degradé, cabecera de 64 px (botón atrás redondo +
-## título Fredoka 28), cuerpo con scroll y pie oscuro con línea arriba.
+## título Fredoka 28), cuerpo con scroll y pie oscuro con línea arriba. En pantallas bajas
+## (`UiScale.is_short`, teléfono apaisado) cabecera y pie se afinan para dejarle alto al cuerpo.
 static func page_frame(opts: Dictionary) -> PageFrame:
+	var short: bool = UiScale.is_short()
 	var root: Control = Control.new()
 	root.name = "pg-%s" % String(opts.get("cls", "")) if opts.has("cls") else "pg"
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -28,14 +30,16 @@ static func page_frame(opts: Dictionary) -> PageFrame:
 	col.add_theme_constant_override("separation", 0)
 	root.add_child(col)
 
-	var head_pad: MarginContainer = _margins(16, 10, 16, 6)
-	head_pad.custom_minimum_size.y = 64
+	var head_pad: MarginContainer = _margins(16, 4, 16, 2) if short else _margins(16, 10, 16, 6)
+	head_pad.custom_minimum_size.y = 50 if short else 64
 	var head: HBoxContainer = HBoxContainer.new()
 	head.add_theme_constant_override("separation", 12)
 	head_pad.add_child(head)
 	var on_back: Callable = opts.get("on_back", Callable())
 	if on_back.is_valid():
 		var back: Button = icon_button(&"back", on_back)
+		if short:
+			back.custom_minimum_size = Vector2(44, 44)
 		back.tooltip_text = opts.get("back_label", "Volver")
 		back.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		head.add_child(back)
@@ -47,7 +51,7 @@ static func page_frame(opts: Dictionary) -> PageFrame:
 	var eyebrow: String = opts.get("eyebrow", "")
 	if eyebrow != "":
 		titles.add_child(UiTheme.eyebrow(eyebrow, UiTheme.SUN, 12))
-	titles.add_child(UiTheme.title(opts.get("title", ""), 28))
+	titles.add_child(UiTheme.title(opts.get("title", ""), 24 if short else 28))
 	head.add_child(titles)
 
 	var right: HBoxContainer = HBoxContainer.new()
@@ -62,7 +66,7 @@ static func page_frame(opts: Dictionary) -> PageFrame:
 	var scroll: ScrollContainer = ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	var body_pad: MarginContainer = _margins(16, 6, 16, 14)
+	var body_pad: MarginContainer = _margins(16, 2, 16, 8) if short else _margins(16, 6, 16, 14)
 	body_pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body_pad.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var body: VBoxContainer = VBoxContainer.new()
@@ -86,8 +90,8 @@ static func page_frame(opts: Dictionary) -> PageFrame:
 		foot_style.border_color = UiTheme.HUD_LINE
 		foot_style.content_margin_left = 16
 		foot_style.content_margin_right = 16
-		foot_style.content_margin_top = 10
-		foot_style.content_margin_bottom = 12
+		foot_style.content_margin_top = 6 if short else 10
+		foot_style.content_margin_bottom = 6 if short else 12
 		foot_panel.add_theme_stylebox_override("panel", foot_style)
 		var footer: HBoxContainer = HBoxContainer.new()
 		footer.add_theme_constant_override("separation", 16)

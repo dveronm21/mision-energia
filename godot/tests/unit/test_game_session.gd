@@ -225,3 +225,16 @@ func test_game_session_velocidad_salvo_clima() -> void:
 	s._hour = zw.storm_to + 0.5
 	check_eq(s.effective_speed(), 4, "pasado el Zonda vuelve a ×4")
 	s.dispose()
+
+
+## Apagón antes de la noche (pasaba en "escuela" a ×4): las cargas nocturnas todavía no se
+## calcularon y `_result()` devolvía null; en Android, la pantalla de resultado cerraba la app.
+func test_game_session_resultado_con_apagon_antes_de_la_noche() -> void:
+	var s: GameSession = GameSession.new(_deps(Levels.casa(), Purchase.make(4, 1, false)))
+	_build_casa(s)
+	check(s._night_loads == null, "de día todavía no hay cargas nocturnas")
+	var r: LevelResult = s._result()
+	check(r != null, "hay resultado aunque no haya llegado la noche")
+	if r != null:
+		check(not r.tips.is_empty(), "el resultado trae consejos")
+	s.dispose()

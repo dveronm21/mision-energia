@@ -3,7 +3,8 @@ extends UiScreen
 ## Briefing del nivel + taller de compras (paneles, baterías, kit) con presupuesto, y
 ## elección de boosters. Equivale a `WorkshopScreen.ts` y `.ws-*` de styles.ts: a la izquierda
 ## la historia del nivel, a la derecha la tarjeta blanca de compras; abajo, el presupuesto y
-## "Construir".
+## "Construir". En un teléfono apaisado (`UiScale.is_short`) todo se arma más fino para que
+## entre sin scroll.
 
 const WARN_TEXT: Color = Color("#ffd27a")
 
@@ -22,6 +23,8 @@ var _warn_label: Label
 var _build_btn: Button
 var _summary_label: Label
 var _booster_box: VBoxContainer
+## Pantalla baja (teléfono): letras, filas y botones más chicos.
+var _short: bool = UiScale.is_short()
 
 
 func _init(deps: WorkshopDeps) -> void:
@@ -39,7 +42,7 @@ func _init(deps: WorkshopDeps) -> void:
 
 	# `.ws-grid`: columnas .85fr / 1.15fr, alineadas arriba.
 	var grid: HBoxContainer = HBoxContainer.new()
-	grid.add_theme_constant_override("separation", 16)
+	grid.add_theme_constant_override("separation", 12 if _short else 16)
 	story.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	story.size_flags_stretch_ratio = 0.85
 	story.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
@@ -63,17 +66,17 @@ func _init(deps: WorkshopDeps) -> void:
 
 func _build_story(max_panels: int) -> VBoxContainer:
 	var col: VBoxContainer = VBoxContainer.new()
-	col.add_theme_constant_override("separation", 8)
-	col.add_child(UiTheme.eyebrow("Nivel %d · %s" % [_lv.order, _lv.name]))
-	var sub: Label = UiTheme.title(_lv.subtitle, 26)
+	col.add_theme_constant_override("separation", 4 if _short else 8)
+	col.add_child(UiTheme.eyebrow("Nivel %d · %s" % [_lv.order, _lv.name], UiTheme.SUN, 12 if _short else 13))
+	var sub: Label = UiTheme.title(_lv.subtitle, 19 if _short else 26)
 	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	col.add_child(sub)
-	var story_text: Label = UiTheme.label(_lv.story, UiTheme.body(700), 16, Color("#dce7e3"))
+	var story_text: Label = UiTheme.label(_lv.story, UiTheme.body(700), 13 if _short else 16, Color("#dce7e3"))
 	story_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	col.add_child(story_text)
 
 	var facts: VBoxContainer = VBoxContainer.new()
-	facts.add_theme_constant_override("separation", 6)
+	facts.add_theme_constant_override("separation", 2 if _short else 6)
 	facts.add_child(_fact(&"panel", "Hasta %d paneles solares" % max_panels))
 	facts.add_child(_fact(&"battery-plus", ("Hasta 1 batería" if _lv.battery_slots == 1 else "Hasta %d baterías" % _lv.battery_slots)))
 	facts.add_child(_fact(&"sun", "Activás a las %s; aguantá hasta las %s" % [JsMath.fmt_hour(_lv.start_hour), JsMath.fmt_hour(_lv.end_hour)]))
@@ -93,10 +96,10 @@ func _build_story(max_panels: int) -> VBoxContainer:
 func _fact(icon_name: StringName, text: String, warn: bool = false) -> Control:
 	var row: HBoxContainer = HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
-	var ic: HudIcon = HudIcon.new(icon_name, 18.0, UiTheme.WARN if warn else UiTheme.SUN)
+	var ic: HudIcon = HudIcon.new(icon_name, 15.0 if _short else 18.0, UiTheme.WARN if warn else UiTheme.SUN)
 	ic.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	row.add_child(ic)
-	var l: Label = UiTheme.label(text, UiTheme.body(700), 14, WARN_TEXT if warn else UiTheme.MUTED)
+	var l: Label = UiTheme.label(text, UiTheme.body(700), 12 if _short else 14, WARN_TEXT if warn else UiTheme.MUTED)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	# Sin esto, un Label con autowrap dentro de un HBoxContainer colapsa a su ancho mínimo
 	# (casi 0) y el texto se parte letra por letra.
@@ -111,11 +114,11 @@ func _fact(icon_name: StringName, text: String, warn: bool = false) -> Control:
 ## `.ws-shop`: tarjeta blanca con las filas de compra y las ayudas.
 func _build_shop() -> PanelContainer:
 	var card: PanelContainer = PanelContainer.new()
-	card.add_theme_stylebox_override("panel", UiTheme.card(20, 12.0, 0))
+	card.add_theme_stylebox_override("panel", UiTheme.card(16 if _short else 20, 8.0 if _short else 12.0, 0))
 	var col: VBoxContainer = VBoxContainer.new()
-	col.add_theme_constant_override("separation", 8)
-	var eb: MarginContainer = UiCommon._margins(4, 2, 4, 2)
-	eb.add_child(UiTheme.eyebrow("Taller de compras", UiTheme.SUN_INK))
+	col.add_theme_constant_override("separation", 4 if _short else 8)
+	var eb: MarginContainer = UiCommon._margins(4, 0 if _short else 2, 4, 0 if _short else 2)
+	eb.add_child(UiTheme.eyebrow("Taller de compras", UiTheme.SUN_INK, 11 if _short else 13))
 	col.add_child(eb)
 
 	_row_panels = _stepper(&"panel", "Paneles solares", "%s créditos c/u" % UiFormat.fmt_int(_lv.prices.panel), 1)
@@ -130,7 +133,7 @@ func _build_shop() -> PanelContainer:
 	fixed.add_theme_constant_override("separation", 10)
 	fixed.add_child(_item_icon(&"bolt", UiTheme.LEAF_DARK))
 	fixed.add_child(_item_text("Inversor híbrido + protección", "Obligatorios · %s créditos" % UiFormat.fmt_int(_lv.prices.base_package)))
-	var incl: Label = UiTheme.label("Incluidos", UiTheme.body(800), 16, UiTheme.LEAF_DARK)
+	var incl: Label = UiTheme.label("Incluidos", UiTheme.body(800), 14 if _short else 16, UiTheme.LEAF_DARK)
 	incl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var incl_pad: MarginContainer = UiCommon._margins(0, 0, 8, 0)
 	incl_pad.add_child(incl)
@@ -138,44 +141,44 @@ func _build_shop() -> PanelContainer:
 	col.add_child(_item_panel(fixed))
 
 	_booster_box = VBoxContainer.new()
-	_booster_box.add_theme_constant_override("separation", 6)
+	_booster_box.add_theme_constant_override("separation", 2 if _short else 6)
 	col.add_child(_booster_box)
 	card.add_child(col)
 	return card
 
 
 ## `.ws-item`: fila gris clara redondeada.
-static func _item_panel(content: Control) -> PanelContainer:
+func _item_panel(content: Control) -> PanelContainer:
 	var p: PanelContainer = PanelContainer.new()
-	var s: StyleBoxFlat = UiTheme.box(UiTheme.PAPER_2, 16)
-	s.content_margin_left = 10
-	s.content_margin_right = 10
-	s.content_margin_top = 8
-	s.content_margin_bottom = 8
+	var s: StyleBoxFlat = UiTheme.box(UiTheme.PAPER_2, 12 if _short else 16)
+	s.content_margin_left = 8 if _short else 10
+	s.content_margin_right = 8 if _short else 10
+	s.content_margin_top = 3 if _short else 8
+	s.content_margin_bottom = 3 if _short else 8
 	p.add_theme_stylebox_override("panel", s)
 	p.add_child(content)
 	return p
 
 
 ## `.ws-ic`: cuadrado blanco de 42 px con el ícono en color.
-static func _item_icon(icon_name: StringName, color: Color = UiTheme.SUN_DARK) -> PanelContainer:
+func _item_icon(icon_name: StringName, color: Color = UiTheme.SUN_DARK) -> PanelContainer:
 	var p: PanelContainer = PanelContainer.new()
-	p.custom_minimum_size = Vector2(42, 42)
+	p.custom_minimum_size = Vector2(32, 32) if _short else Vector2(42, 42)
 	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	p.add_theme_stylebox_override("panel", UiTheme.box(UiTheme.PAPER, 12))
 	var c: CenterContainer = CenterContainer.new()
-	c.add_child(HudIcon.new(icon_name, 24.0, color))
+	c.add_child(HudIcon.new(icon_name, 19.0 if _short else 24.0, color))
 	p.add_child(c)
 	return p
 
 
-static func _item_text(title: String, sub: String) -> VBoxContainer:
+func _item_text(title: String, sub: String) -> VBoxContainer:
 	var txt: VBoxContainer = VBoxContainer.new()
 	txt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	txt.alignment = BoxContainer.ALIGNMENT_CENTER
 	txt.add_theme_constant_override("separation", 0)
-	txt.add_child(UiTheme.label(title, UiTheme.display(600), 18, UiTheme.INK))
-	var s: Label = UiTheme.label(sub, UiTheme.body(700), 13, UiTheme.INK_3)
+	txt.add_child(UiTheme.label(title, UiTheme.display(600), 15 if _short else 18, UiTheme.INK))
+	var s: Label = UiTheme.label(sub, UiTheme.body(700), 11 if _short else 13, UiTheme.INK_3)
 	s.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	txt.add_child(s)
 	return txt
@@ -193,7 +196,7 @@ func _stepper(icon_name: StringName, title: String, sub: String, kind: int) -> S
 	stepper.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.minus = _step_button(&"minus", _change.bind(kind, -1))
 	stepper.add_child(row.minus)
-	row.out = UiTheme.label("0", UiTheme.display(600), 26, UiTheme.INK)
+	row.out = UiTheme.label("0", UiTheme.display(600), 21 if _short else 26, UiTheme.INK)
 	row.out.custom_minimum_size = Vector2(34, 0)
 	row.out.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	row.out.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -205,10 +208,10 @@ func _stepper(icon_name: StringName, title: String, sub: String, kind: int) -> S
 	return row
 
 
-## `.ws-step`: cuadrado oscuro de 48 px; deshabilitado queda al 30 %.
-static func _step_button(icon_name: StringName, on_pressed: Callable) -> Button:
+## `.ws-step`: cuadrado oscuro de 48 px (40 en el teléfono); deshabilitado queda al 30 %.
+func _step_button(icon_name: StringName, on_pressed: Callable) -> Button:
 	var b: Button = Button.new()
-	b.custom_minimum_size = Vector2(48, 48)
+	b.custom_minimum_size = Vector2(40, 40) if _short else Vector2(48, 48)
 	UiTheme.style_button(b, UiTheme.box(UiTheme.HUD, 14))
 	var c: CenterContainer = CenterContainer.new()
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -227,18 +230,18 @@ func _build_footer() -> Array[Control]:
 	# `.ws-budget`: "Gastás" + cifra a la derecha, barra amarilla y resumen.
 	var budget_col: VBoxContainer = VBoxContainer.new()
 	budget_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	budget_col.add_theme_constant_override("separation", 5)
+	budget_col.add_theme_constant_override("separation", 2 if _short else 5)
 	var budget_row: HBoxContainer = HBoxContainer.new()
-	var gastas: Label = UiTheme.label("Gastás", UiTheme.body(800), 14, UiTheme.MUTED)
+	var gastas: Label = UiTheme.label("Gastás", UiTheme.body(800), 12 if _short else 14, UiTheme.MUTED)
 	gastas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	gastas.size_flags_vertical = Control.SIZE_SHRINK_END
 	budget_row.add_child(gastas)
-	_spent_label = UiTheme.label("", UiTheme.display(700), 22)
+	_spent_label = UiTheme.label("", UiTheme.display(700), 17 if _short else 22)
 	budget_row.add_child(_spent_label)
 	budget_col.add_child(budget_row)
 
 	var bar: Panel = Panel.new()
-	bar.custom_minimum_size = Vector2(0, 12)
+	bar.custom_minimum_size = Vector2(0, 8 if _short else 12)
 	bar.add_theme_stylebox_override("panel", UiTheme.box(Color(1, 1, 1, 0.14), 999))
 	bar.clip_contents = true
 	_bar_fill = Panel.new()
@@ -248,19 +251,19 @@ func _build_footer() -> Array[Control]:
 	_bar_fill.anchor_bottom = 1.0
 	bar.add_child(_bar_fill)
 	budget_col.add_child(bar)
-	_summary_label = UiTheme.label("", UiTheme.body(700), 13, UiTheme.MUTED)
+	_summary_label = UiTheme.label("", UiTheme.body(700), 11 if _short else 13, UiTheme.MUTED)
 	budget_col.add_child(_summary_label)
 
 	var right: HBoxContainer = HBoxContainer.new()
 	right.add_theme_constant_override("separation", 12)
-	_warn_label = UiTheme.label("", UiTheme.body(800), 14, WARN_TEXT)
+	_warn_label = UiTheme.label("", UiTheme.body(800), 12 if _short else 14, WARN_TEXT)
 	_warn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_warn_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_warn_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_warn_label.custom_minimum_size = Vector2(220, 0)
 	right.add_child(_warn_label)
-	_build_btn = UiCommon.action_button("Construir", _on_build, &"primary", &"bolt", true)
-	_build_btn.custom_minimum_size.y = 56
+	_build_btn = UiCommon.action_button("Construir", _on_build, &"primary", &"bolt", not _short)
+	_build_btn.custom_minimum_size.y = 46 if _short else 56
 	_build_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	right.add_child(_build_btn)
 	return [budget_col, right]
@@ -388,8 +391,8 @@ func _render_boosters() -> void:
 		if not owned_ids.has(id):
 			_picked.erase(id)
 
-	var head: MarginContainer = UiCommon._margins(4, 4, 4, 0)
-	head.add_child(UiTheme.label("Ayudas para llevar", UiTheme.display(600), 17, UiTheme.INK))
+	var head: MarginContainer = UiCommon._margins(4, 0 if _short else 4, 4, 0)
+	head.add_child(UiTheme.label("Ayudas para llevar", UiTheme.display(600), 14 if _short else 17, UiTheme.INK))
 	_booster_box.add_child(head)
 
 	if owned.is_empty():
@@ -398,7 +401,7 @@ func _render_boosters() -> void:
 		var pad: Control = Control.new()
 		pad.custom_minimum_size.x = 0
 		empty_row.add_child(pad)
-		var empty_label: Label = UiTheme.label("No tenés ayudas todavía.", UiTheme.body(700), 14, UiTheme.INK_3)
+		var empty_label: Label = UiTheme.label("No tenés ayudas todavía.", UiTheme.body(700), 12 if _short else 14, UiTheme.INK_3)
 		empty_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		empty_row.add_child(empty_label)
 		if _deps.on_shop.is_valid():
@@ -415,11 +418,11 @@ func _render_boosters() -> void:
 
 
 ## `.link-btn`: texto subrayado, Nunito 800 15 oscuro.
-static func _link_button(text: String, on_click: Callable) -> Button:
+func _link_button(text: String, on_click: Callable) -> Button:
 	var b: Button = Button.new()
 	b.text = text
 	b.flat = true
-	b.custom_minimum_size.y = 48
+	b.custom_minimum_size.y = 36 if _short else 48
 	b.add_theme_font_override("font", UiTheme.body(800))
 	b.add_theme_font_size_override("font_size", 15)
 	for state: String in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
@@ -440,7 +443,7 @@ func _booster_chip(b: Product) -> Button:
 	var on: bool = _picked.has(b.id)
 	var btn: Button = Button.new()
 	var title_w: float = UiTheme.body(800).get_string_size(b.title, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
-	btn.custom_minimum_size = Vector2(maxf(title_w, 60.0) + 22.0 + 28.0 + 8.0 * 3.0 + 18.0, 52)
+	btn.custom_minimum_size = Vector2(maxf(title_w, 60.0) + 22.0 + 28.0 + 8.0 * 3.0 + 18.0, 42 if _short else 52)
 	var normal: StyleBoxFlat = UiTheme.box(Color("#e6f4ea") if on else UiTheme.PAPER, 14, 2, UiTheme.LEAF_DARK if on else UiTheme.LINE)
 	UiTheme.style_button(btn, normal)
 	var row: HBoxContainer = HBoxContainer.new()

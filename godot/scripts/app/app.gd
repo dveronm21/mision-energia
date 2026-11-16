@@ -31,6 +31,7 @@ var _keyboard: KeyboardInput = KeyboardInput.new()
 var _run: LevelRun = null
 var _quality: StringName = &"medium"
 var _speed: int = 1
+var _fps: StringName = FrameRate.AUTO
 var _ui_size: StringName = UiScale.NORMAL
 var _welcome_checked: bool = false
 ## Después de "Reiniciar progreso" el menú de abajo tiene los servicios viejos: al salir de
@@ -87,6 +88,8 @@ func _ready() -> void:
 	if not QUALITY_INDEX.has(_quality):
 		_quality = &"medium"
 	_speed = GameSpeed.load_from(_services.store)
+	_fps = FrameRate.load_from(_services.store)
+	FrameRate.apply(_fps)
 	_ui_size = UiScale.load_size(_services.store)
 	_apply_ui_scale()
 	get_window().size_changed.connect(_apply_ui_scale)
@@ -275,6 +278,8 @@ func push_settings() -> void:
 	d.on_quality_change = _set_quality
 	d.speed = _speed
 	d.on_speed_change = _set_speed
+	d.fps = _fps
+	d.on_fps_change = _set_fps
 	d.ui_size = _ui_size
 	d.on_ui_size_change = _set_ui_size
 	d.on_reset_progress = _reset_progress
@@ -306,6 +311,12 @@ func _set_speed(v: int) -> void:
 		session.speed = v
 
 
+func _set_fps(v: StringName) -> void:
+	_fps = v
+	FrameRate.save_to(_s().store, v)
+	FrameRate.apply(v)
+
+
 func _set_ui_size(v: StringName) -> void:
 	_ui_size = v
 	UiScale.save_size(_s().store, v)
@@ -316,12 +327,13 @@ func _apply_ui_scale() -> void:
 	UiScale.apply(get_window(), tv != null, _ui_size)
 
 
-## Borra el progreso pero conserva los ajustes (calidad, sonido, velocidad y tamaño), igual que la web.
+## Borra el progreso pero conserva los ajustes (calidad, sonido, velocidad, cuadros y tamaño), igual que la web.
 func _reset_progress() -> void:
 	var muted: bool = _audio().is_muted()
 	_services.reset_progress()
 	_s().store.save_value(QUALITY_KEY, String(_quality))
 	GameSpeed.save_to(_s().store, _speed)
+	FrameRate.save_to(_s().store, _fps)
 	UiScale.save_size(_s().store, _ui_size)
 	_audio().set_muted(muted)
 	_welcome_checked = false
