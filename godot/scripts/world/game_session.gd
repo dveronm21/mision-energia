@@ -191,6 +191,26 @@ func is_running() -> bool:
 	return _phase != PHASE_BUILD
 
 
+## Duelo: la planta está activada y funcionando al 100 % (ninguna fila con el conector flojo).
+func plant_ok() -> bool:
+	return _phase == PHASE_RUNNING and not _world.any_faulty()
+
+
+## Duelo: avance de la obra para la franja del rival en el otro tele.
+func duel_progress() -> Dictionary:
+	var w: PlantWorld = _world
+	var cables: int = 0
+	for c: StringName in [CableNetwork.COLOR_ORANGE, CableNetwork.COLOR_BLUE, CableNetwork.COLOR_VIOLET]:
+		if w.cables.cable_connected(c):
+			cables += 1
+	return {
+		"panels": w.panels_installed(), "total": _purchase.panels,
+		"batteries": w.batteries_installed(), "batteries_total": _purchase.batteries,
+		"protection": w.protection.installed(), "cables": cables,
+		"activated": _phase != PHASE_BUILD, "ok": plant_ok(),
+	}
+
+
 func toast(text: String, kind: StringName = &"info") -> void:
 	_d.ui.show_toast(text, kind, 4600 if kind == &"bad" else 3200)
 	if kind == &"bad":

@@ -56,7 +56,9 @@ export type ClientMsg =
   | { t: 'input'; s: InputState }
   /** `rtt` (opcional): última latencia ida y vuelta medida por la tablet, en ms, para mostrarla en el tele. */
   | { t: 'ping'; at: number; rtt?: number }
-  | { t: 'bye' };
+  | { t: 'bye' }
+  /** Botón del menú del tele tocado en la tablet: `v` = versión de la lista vista, `i` = posición. */
+  | { t: 'pick'; v: number; i: number };
 
 /* ---------- Mensajes tele → tablet ---------- */
 export type ActionStyle = 'normal' | 'idle' | 'drop';
@@ -68,6 +70,9 @@ export interface ControllerContext {
   objective: string;            // paso actual de la misión
   screen: 'lobby' | 'menu' | 'playing' | 'paused' | 'result';
   status?: string;              // línea corta: "Batería 57% · 14:30"
+  /** Botones de la pantalla del tele fuera de la partida (pausa, menús, resultados), para tocarlos
+   *  directo en la tablet. `f` = el que tiene el foco en el tele. */
+  menu?: { v: number; items: { l: string; f?: boolean }[] };
 }
 
 export type ServerMsg =

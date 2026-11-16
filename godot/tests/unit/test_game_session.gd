@@ -97,6 +97,18 @@ func test_game_session_arma_la_planta_completa_y_activa() -> void:
 	check_eq(s.phase(), SessionPort.PHASE_RUNNING, "la planta queda corriendo tras activar con todo instalado")
 	check(s.snapshot() != null, "hay una foto del simulador")
 
+	# Duelo: con una fila con el conector flojo, activar no alcanza para la planta al 100 %.
+	var p: Dictionary = s.duel_progress()
+	check(bool(p["activated"]) and int(p["panels"]) == 4 and int(p["cables"]) == 3, "avance para el rival")
+	check_eq(bool(p["ok"]), s.plant_ok(), "el avance dice si está al 100 %")
+	if s.world().mounts.size() > 1:
+		s.world().mounts[1].faulty = true # conector flojo en un panel ya instalado
+	check(s.world().any_faulty() and not s.plant_ok(), "con una fila caída todavía no está al 100 %")
+	for mt: Mount in s.world().mounts:
+		if mt.faulty:
+			s.repair_panel(mt)
+	check(s.plant_ok(), "reparado el conector: planta al 100 %")
+
 	# Avanzar varios cuadros no debería explotar.
 	for _i: int in 30:
 		s.update(0.05, Vector2(0.0, -1.0))

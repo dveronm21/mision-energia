@@ -100,6 +100,7 @@ export class Connection {
   }
 
   sendInput(s: InputState): boolean { return this.send({ t: 'input', s }); }
+  sendPick(v: number, i: number): boolean { return this.send({ t: 'pick', v, i }); }
 
   send(m: ClientMsg): boolean {
     const ws = this.ws;

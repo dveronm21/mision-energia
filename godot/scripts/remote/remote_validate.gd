@@ -5,6 +5,8 @@ extends RefCounted
 
 ## Largo máximo de un mensaje crudo (un input real ocupa ~110 caracteres).
 const MAX_MSG_CHARS: int = 1024
+## Botones del menú del tele que se replican en la tablet.
+const MAX_MENU_ITEMS: int = 16
 const MAX_NAME_CHARS: int = 14
 const MAX_TOKEN_CHARS: int = 64
 ## Eventos procesados como máximo en un poll (protege el frame).
@@ -153,7 +155,33 @@ static func parse_client_msg(raw: Variant) -> Dictionary:
 			return msg
 		"bye":
 			return {"t": "bye"}
+		"pick":
+			# Botón del menú del tele tocado en la tablet: versión de la lista que vio y posición.
+			if not is_counter(d.get("v")) or not is_counter(d.get("i")):
+				return {}
+			var pv: int = int(d["v"])
+			var pi: int = int(d["i"])
+			if pv < 1 or pi >= MAX_MENU_ITEMS:
+				return {}
+			return {"t": "pick", "v": pv, "i": pi}
 	return {}
+
+
+## `menu` del contexto: {v, items: [{l, f?}]} con textos cortos; {} si no viene o es inválido.
+static func sanitize_menu(m: Variant) -> Dictionary:
+	if typeof(m) != TYPE_DICTIONARY or not is_counter((m as Dictionary).get("v")) or typeof((m as Dictionary).get("items")) != TYPE_ARRAY:
+		return {}
+	var items: Array = []
+	for it: Variant in ((m as Dictionary)["items"] as Array).slice(0, MAX_MENU_ITEMS):
+		if typeof(it) != TYPE_DICTIONARY or typeof((it as Dictionary).get("l")) != TYPE_STRING:
+			return {}
+		var o: Dictionary = {"l": _str((it as Dictionary)["l"], 32)}
+		if (it as Dictionary).get("f") == true:
+			o["f"] = true
+		items.append(o)
+	if items.is_empty() or int((m as Dictionary)["v"]) < 1:
+		return {}
+	return {"v": int((m as Dictionary)["v"]), "items": items}
 
 
 ## Valida los eventos del puente ({e:'open'|'msg'|'close', id, ...}). Ignora los mal formados.
@@ -248,6 +276,9 @@ static func parse_server_msg(raw: Variant) -> Dictionary:
 			}
 			if typeof(cd.get("status")) == TYPE_STRING:
 				ctx["status"] = _str(cd["status"], 80)
+			var menu: Dictionary = sanitize_menu(cd.get("menu"))
+			if not menu.is_empty():
+				ctx["menu"] = menu
 			return {"t": "ctx", "c": ctx}
 	return {}
 

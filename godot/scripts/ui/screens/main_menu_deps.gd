@@ -11,3 +11,5 @@ var on_play: Callable
 var on_shop: Callable
 var on_wardrobe: Callable
 var on_settings: Callable
+## Solo en el tele: duelo contra otra pantalla. Inválido = sin botón.
+var on_duel: Callable = Callable()

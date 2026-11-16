@@ -42,6 +42,13 @@ var _menu_stale: bool = false
 var _pause_menu: PauseMenu = null
 ## null fuera del modo TV.
 var tv: TvMode = null
+## Duelo contra otra pantalla (solo modo TV). null = no hay duelo.
+var duel: DuelMatch = null
+var _duel_screen: DuelScreen = null
+var _duel_banner: DuelBanner = null
+var _duel_sent: Dictionary = {}
+## Botones de la pantalla del tele replicados en las tablets.
+var _mirror: MenuMirror = MenuMirror.new()
 
 
 func _ready() -> void:
@@ -103,11 +110,16 @@ func _process(delta: float) -> void:
 	var dt: float = minf(0.1, maxf(0.0, delta))
 	if tv != null:
 		tv.poll()
+	if duel != null:
+		_update_duel(dt)
 	var ss: GameSession = session
 	var menu_open: bool = ui.screens.top() != null
 	if tv != null and (ss == null or menu_open):
 		tv.navigate_menus(dt)
 		_push_menu_context()
+		for slot: int in RemoteHost.SLOTS:
+			for p: Dictionary in tv.host.take_picks(slot):
+				_mirror.pick(int(p["v"]), int(p["i"]))
 	if ss == null:
 		return
 	var local: Vector2 = (hud.joystick.vector() + _keyboard.vector()).clamp(-Vector2.ONE, Vector2.ONE)
@@ -193,6 +205,8 @@ func show_menu() -> void:
 	d.on_shop = push_shop
 	d.on_wardrobe = push_wardrobe
 	d.on_settings = push_settings
+	if tv != null:
+		d.on_duel = start_duel
 	ui.screens.reset(MainMenu.new(d))
 	if not _welcome_checked:
 		_welcome_checked = true
@@ -390,6 +404,8 @@ func start_level(run: LevelRun) -> void:
 
 
 func _on_finished(result: LevelResult) -> void:
+	if duel != null:
+		return # en el duelo el resultado lo da la carrera, no el día simulado
 	var s: AppServices = _s()
 	var outcome: LevelRecordOutcome = s.progress.record_result(result)
 	s.bus.emit_level_finished(result)
@@ -421,6 +437,8 @@ func pause() -> void:
 	var ss: GameSession = session
 	if ss == null or ss.paused or ss.phase() == SessionPort.PHASE_FINISHED:
 		return
+	if duel != null:
+		return # en el duelo no se pausa: el reloj del rival sigue corriendo
 	ss.paused = true
 	hud.joystick.reset()
 	var d: PauseDeps = PauseDeps.new()
@@ -470,6 +488,116 @@ func _place_toast() -> void:
 	t.root.offset_bottom = top + t.root.get_combined_minimum_size().y
 
 
+# ================================================================== duelo
+
+
+## Menú → Duelo: arranca a buscar la otra pantalla.
+func start_duel() -> void:
+	var link: DuelLink = DuelLink.new(_duel_name())
+	# Pruebas con dos juegos en la misma compu: `-- --duel-port=18767 --duel-beacon=18768 --duel-targets=18769`.
+	for a: String in OS.get_cmdline_user_args():
+		if a.begins_with("--duel-port="):
+			link.port = int(a.trim_prefix("--duel-port="))
+		elif a.begins_with("--duel-beacon="):
+			link.beacon_port = int(a.trim_prefix("--duel-beacon="))
+		elif a.begins_with("--duel-targets="):
+			link.beacon_targets = [] as Array[int]
+			for t: String in a.trim_prefix("--duel-targets=").split(",", false):
+				link.beacon_targets.append(int(t))
+		elif a.begins_with("--duel-bind="):
+			link.bind_address = a.trim_prefix("--duel-bind=")
+			link.beacon_address = link.bind_address
+	if link.start() != OK:
+		ui.show_toast("No se pudo abrir el duelo en esta red.", UiRootPort.KIND_BAD, 4000)
+		return
+	duel = DuelMatch.new(link)
+	_show_duel_screen()
+
+
+## Nombre que ve el otro tele: los jugadores con tablet ("Ana y Beto") o, sin tablets, uno genérico.
+func _duel_name() -> String:
+	var names: Array[String] = []
+	if tv != null:
+		for p: RemotePlayer in tv.players():
+			names.append(p.name)
+	return " y ".join(names) if not names.is_empty() else "la otra pantalla"
+
+
+func _show_duel_screen() -> void:
+	_end_duel_play()
+	show_menu()
+	_duel_screen = DuelScreen.new(duel, _s().levels.all(), leave_duel)
+	ui.screens.push(_duel_screen)
+
+
+func leave_duel() -> void:
+	if duel != null:
+		duel.link.stop()
+	duel = null
+	_duel_screen = null
+	_end_duel_play()
+	show_menu()
+
+
+func _update_duel(dt: float) -> void:
+	for e: StringName in duel.update(dt):
+		if duel == null:
+			return
+		match e:
+			&"go":
+				_start_duel_level()
+			&"finished":
+				_show_duel_result()
+			&"lobby":
+				_show_duel_screen()
+			&"progress", &"peer_lost":
+				if _duel_banner != null:
+					_duel_banner.set_text("Se cortó la conexión: terminá tu planta" if duel.peer_lost
+						else DuelBanner.describe(duel.peer_name(), duel.peer_progress))
+			&"lost":
+				if session != null or _duel_screen == null or ui.screens.top() != _duel_screen:
+					_show_duel_screen()
+				ui.show_toast("Se perdió la conexión con la otra pantalla.", UiRootPort.KIND_BAD, 3600)
+			_:
+				if _duel_screen != null and ui.screens.top() == _duel_screen:
+					_duel_screen.refresh()
+	if _duel_screen != null and ui.screens.top() == _duel_screen:
+		_duel_screen.tick()
+	if duel.phase == DuelMatch.Phase.PLAYING and session != null:
+		var p: Dictionary = session.duel_progress()
+		if p != _duel_sent:
+			_duel_sent = p
+			duel.report_progress(p)
+		if session.plant_ok():
+			duel.report_done()
+
+
+func _start_duel_level() -> void:
+	var level: LevelDefinition = _s().levels.get_level(duel.level_id)
+	start_level(LevelRun.make(duel.level_id, duel.purchase(), [] as Array[StringName], level))
+	session.speed = 1
+	_duel_sent = {}
+	_duel_banner = DuelBanner.new()
+	_duel_banner.set_text(DuelBanner.describe(duel.peer_name(), {}))
+	ui.hud_layer.add_child(_duel_banner.root)
+
+
+func _show_duel_result() -> void:
+	var level: LevelDefinition = _s().levels.get_level(duel.level_id)
+	_end_duel_play()
+	ui.screens.reset(DuelResultScreen.new(duel, level.name, func() -> void:
+		duel.back_to_lobby()
+		_show_duel_screen(), leave_duel, _audio()))
+
+
+## Cierra la partida del duelo y saca la franja del rival.
+func _end_duel_play() -> void:
+	if _duel_banner != null:
+		_duel_banner.root.queue_free()
+		_duel_banner = null
+	_end_session()
+
+
 # ================================================================== modo TV
 
 
@@ -479,29 +607,33 @@ func _on_tv_join(p: RemotePlayer) -> void:
 		session.add_technician(p.slot, p.name, Color.from_string(p.color, UiTheme.SUN))
 
 
-## Aviso de la partida para las tablets: vibración siempre, y el texto solo a quien lo provocó.
+## Aviso de la partida para las tablets: el texto (también las pistas "info") y una vibración en
+## los logros y errores. Lo que provocó un técnico va solo a su tablet; el clima y la noche, a todas.
 func _on_session_feedback(slot: int, kind: StringName, text: String) -> void:
-	var targets: Array[int] = [slot] if slot >= 0 else RemoteHost.SLOTS
-	for s: int in targets:
+	for s: int in RemoteHost.targets(slot):
 		if kind == &"bad":
 			tv.host.haptic(s, [90, 60, 90])
 		elif kind == &"good":
 			tv.host.haptic(s, [35])
-		if slot >= 0 and kind != &"info":
-			tv.host.toast(s, text, String(kind))
+		tv.host.toast(s, text, String(kind))
 
 
 ## Qué muestran las tablets fuera de la partida, según la pantalla de arriba del tele.
 func _push_menu_context() -> void:
 	var top: UiScreen = ui.screens.top()
+	var menu: Dictionary = _mirror.scan(top.root if top != null else null)
 	if top is LobbyScreen:
-		tv.menu_context("lobby", "¡Listo! Cuando estén todos, tocá Empezar en el tele")
+		tv.menu_context("lobby", "¡Listo! Cuando estén todos, tocá Empezar", menu)
 	elif top is PauseMenu:
-		tv.menu_context("paused", "Pausa: elegí en el tele con el stick y el botón")
+		tv.menu_context("paused", "Pausa: elegí qué hacer", menu)
+	elif top is DuelResultScreen and duel != null:
+		tv.menu_context("result", DuelResultScreen.tablet_text(duel), menu)
 	elif top is ResultScreen:
-		tv.menu_context("result", "¡Mirá el resultado en el tele!")
+		tv.menu_context("result", "¡Mirá el resultado en el tele!", menu)
+	elif top is DuelScreen and duel != null:
+		tv.menu_context("menu", DuelScreen.tablet_text(duel), menu)
 	else:
-		tv.menu_context("menu", "Elegí en el tele: mové el stick y tocá el botón")
+		tv.menu_context("menu", "Tocá una opción o usá las flechas", menu)
 
 
 func _on_sfx(sfx_name: String) -> void:

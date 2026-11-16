@@ -33,6 +33,14 @@ const DEFAULT_TV_NAME: String = "Misión Energía TV"
 const SLOTS: Array[int] = [0, 1]
 
 
+## A qué tablets va un aviso: a la del técnico que lo provocó, o a todas si `slot` < 0.
+static func targets(slot: int) -> Array[int]:
+	if slot < 0:
+		return SLOTS.duplicate()
+	var one: Array[int] = [slot]
+	return one
+
+
 ## Conexión WebSocket conocida por el host.
 class Conn:
 	var id: int
@@ -81,6 +89,8 @@ var _make_token: Callable
 var _conns: Dictionary = {}          # int → Conn
 var _seats: Array[Seat] = [null, null]
 var _inputs: Array[RemoteInputSource] = []
+## Por asiento: botones del menú que tocó la tablet y el tele todavía no leyó ({v, i}).
+var _picks: Array[Array] = [[], []]
 var _ctx: Array[SlotCtx] = []
 
 
@@ -114,6 +124,13 @@ func tv_name() -> String:
 
 
 ## Entrada del asiento (estable: siempre la misma instancia).
+## Botones del menú que tocó la tablet desde la última llamada ({v, i}, en orden).
+func take_picks(slot: int) -> Array:
+	var out: Array = _picks[slot]
+	_picks[slot] = []
+	return out
+
+
 func input(slot: int) -> RemoteInputSource:
 	return _inputs[slot]
 
@@ -297,6 +314,9 @@ func _on_message(id: int, data: String, now: float) -> void:
 	match t:
 		"input":
 			_inputs[c.slot].apply_state(msg["s"])
+		"pick":
+			if _picks[c.slot].size() < 4:
+				_picks[c.slot].append({"v": msg["v"], "i": msg["i"]})
 		"ping":
 			if msg.has("rtt"):
 				seat.latency_ms = msg["rtt"]
@@ -395,6 +415,7 @@ func _free_seat(slot: int, reason: String) -> void:
 	if _seats[slot] == null:
 		return
 	_seats[slot] = null
+	_picks[slot] = []
 	_inputs[slot].disconnect_source()
 	left.emit(slot, reason)
 

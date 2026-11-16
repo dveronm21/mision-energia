@@ -87,6 +87,7 @@ func _init(p_slot: int, allow_kick: bool) -> void:
 		kick_button.icon = LobbyStyle.icon("close", LobbyStyle.px(3.0), Color.WHITE)
 		kick_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		kick_button.pressed.connect(func() -> void: kick_requested.emit(slot))
+		kick_button.set_meta(MenuMirror.SKIP_META, true) # solo desde el tele
 		hb.add_child(kick_button)
 	render(null, 0)
 

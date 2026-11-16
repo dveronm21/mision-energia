@@ -52,6 +52,19 @@ class FakeTablet:
 	func hello() -> void:
 		send({"t": "hello", "v": RemoteProtocol.PROTOCOL_VERSION, "name": name, "device": "browser"})
 
+	## Toca en la tablet el botón del menú del tele que tiene este texto. false si no está.
+	func pick(label: String) -> bool:
+		var m: Dictionary = ctx.get("menu", {})
+		var items: Array = m.get("items", [])
+		for i: int in items.size():
+			if String(items[i].get("l", "")) == label:
+				send({"t": "pick", "v": m["v"], "i": i})
+				return true
+		return false
+
+	func menu_labels() -> Array:
+		return (ctx.get("menu", {}).get("items", []) as Array).map(func(it: Dictionary) -> String: return String(it.get("l", "")))
+
 	func tap(button: String) -> void:
 		taps[button] += 1
 		send_input()
@@ -100,6 +113,18 @@ func _run() -> void:
 	check(_app.ui.screens.top() is MainMenu, "la acción de la tablet tocó Empezar → menú")
 	await _shot("tv_02_menu")
 
+	# Los botones del tele llegan a la tablet y tocarlos los aprieta (sin el control remoto).
+	await _pump_until([ana, beto], func() -> bool: return ana.menu_labels().has("Jugar"))
+	check(ana.menu_labels().has("Jugar") and ana.menu_labels().has("Ajustes"), "la tablet recibe los botones del menú")
+	check(ana.pick("Ajustes"), "Ana toca Ajustes en la tablet")
+	await _pump_until([ana, beto], func() -> bool: return _app.ui.screens.top() is SettingsScreen)
+	check(_app.ui.screens.top() is SettingsScreen, "el tele abrió Ajustes")
+	await _pump_until([ana, beto], func() -> bool: return ana.menu_labels().has("Volver"))
+	check(ana.menu_labels().back() == "Volver", "Volver queda al final de la lista")
+	ana.pick("Volver")
+	await _pump_until([ana, beto], func() -> bool: return _app.ui.screens.top() is MainMenu)
+	check(_app.ui.screens.top() is MainMenu, "Volver desde la tablet")
+
 	_app.start_level(LevelRun.make("casa", Purchase.make(4, 1, false), [] as Array[StringName]))
 	await _pump([ana, beto], 30)
 	var s: GameSession = _app.session
@@ -130,14 +155,36 @@ func _run() -> void:
 	check(bool(beto.ctx.get("toolOn", false)), "Beto sacó el multímetro (toolOn en su tablet)")
 	check(not bool(ana.ctx.get("toolOn", true)), "Ana no")
 
+	# Avisos: Beto instala un panel desde su tablet → vibra y ve el texto; a Ana no le llega el texto.
+	beto.tap("tool") # guarda el multímetro
+	await _pump([ana, beto], 10)
+	var tb: Technician = s.technician_for_slot(1)
+	s._bind(tb)
+	s.take_from_pallet()
+	s._save_actor()
+	s._bind(s.technician_for_slot(0))
+	tb.player.position = s.world().mounts[0].approach
+	await _pump([ana, beto], 5)
+	var t0: int = beto.toasts
+	var h0: int = beto.haptics
+	var ta: int = ana.toasts
+	beto.tap("action")
+	await _pump_until([ana, beto], func() -> bool: return beto.toasts > t0 and beto.haptics > h0, 120)
+	check(s.world().panels_installed() >= 1, "Beto instaló el panel desde la tablet")
+	check(beto.toasts > t0, "a la tablet de Beto le llega el aviso")
+	check(beto.haptics > h0, "la tablet de Beto vibra")
+	check(ana.toasts == ta, "a Ana no le llega el aviso de Beto")
+
 	# Pausa desde la tablet.
 	ana.tap("pause")
 	await _pump_until([ana, beto], func() -> bool: return _app.ui.screens.top() is PauseMenu)
 	check(_app.ui.screens.top() is PauseMenu, "pausa desde la tablet")
 	await _pump([ana, beto], 15)
 	check(String(ana.ctx.get("screen", "")) == "paused", "las tablets saben que está en pausa")
+	await _pump_until([ana, beto], func() -> bool: return ana.menu_labels().has("Seguir jugando"))
+	check(ana.menu_labels().has("Reiniciar nivel") and ana.menu_labels().has("Salir al mapa"), "la tablet ve el menú de pausa")
 	await _shot("tv_04_pausa")
-	ana.tap("pause")
+	ana.pick("Seguir jugando")
 	await _pump_until([ana, beto], func() -> bool: return not (_app.ui.screens.top() is PauseMenu))
 	check(not s.paused, "'pausa' de nuevo en la tablet → sigue el juego")
 

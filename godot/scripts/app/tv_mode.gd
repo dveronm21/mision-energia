@@ -124,11 +124,15 @@ static func _press(action: StringName) -> void:
 		Input.parse_input_event(ev)
 
 
-## Contexto para todas las tablets fuera de la partida (menú, sala, resultado).
-func menu_context(screen: String, objective: String) -> void:
+## Contexto para todas las tablets fuera de la partida (menú, sala, resultado). `menu`: los botones
+## de la pantalla del tele (`MenuMirror.scan`), para tocarlos directo desde la tablet.
+func menu_context(screen: String, objective: String, menu: Dictionary = {}) -> void:
 	if host == null:
 		return
-	host.set_context_all(RemoteProtocol.make_context("Aceptar", "normal", true, objective, screen))
+	var c: Dictionary = RemoteProtocol.make_context("Aceptar", "normal", true, objective, screen)
+	if not menu.is_empty():
+		c["menu"] = menu
+	host.set_context_all(c)
 
 
 func dispose() -> void:

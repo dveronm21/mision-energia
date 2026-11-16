@@ -2,7 +2,7 @@
  * Validación defensiva de lo que llega por la red (tablet → tele) y por el puente nativo.
  * Nada de lo que viene de afuera se usa sin pasar por acá: tipos, rangos y largos acotados.
  */
-import type { BridgeEvent, ClientMsg, InputState, ServerMsg, TapCounters } from './protocol';
+import type { BridgeEvent, ClientMsg, ControllerContext, InputState, ServerMsg, TapCounters } from './protocol';
 
 export const LIMITS = {
   /** Largo máximo de un mensaje crudo (un input real ocupa ~110 caracteres). */
@@ -81,6 +81,11 @@ export function parseClientMsg(raw: unknown): ClientMsg | null {
     }
     case 'bye':
       return { t: 'bye' };
+    case 'pick': {
+      // Botón del menú del tele tocado en la tablet (versión de la lista vista y posición).
+      if (!isCounter(v.v) || !isCounter(v.i) || v.v < 1 || v.i >= 16) return null;
+      return { t: 'pick', v: v.v, i: v.i };
+    }
     default:
       return null;
   }
@@ -145,6 +150,7 @@ export function parseServerMsg(raw: unknown): ServerMsg | null {
           objective: str(c.objective, 140),
           screen,
           status: typeof c.status === 'string' ? str(c.status, 80) : undefined,
+          menu: parseMenu(c.menu),
         },
       };
     }
@@ -161,4 +167,16 @@ export function sanitizeHaptic(p: unknown): number[] | null {
     out.push(Math.round(clamp(n, 0, LIMITS.maxHapticMs)));
   }
   return out;
+}
+
+/** `menu` del contexto: hasta 16 botones con texto corto; undefined si no viene o es inválido. */
+export function parseMenu(m: unknown): ControllerContext['menu'] {
+  if (!isObj(m) || typeof m.v !== 'number' || !Number.isInteger(m.v) || m.v < 1 || !Array.isArray(m.items)) return undefined;
+  const items: { l: string; f?: boolean }[] = [];
+  for (const it of m.items.slice(0, 16)) {
+    if (!isObj(it) || typeof it.l !== 'string') return undefined;
+    const l = it.l.slice(0, 32);
+    items.push(it.f === true ? { l, f: true } : { l });
+  }
+  return items.length ? { v: m.v, items } : undefined;
 }

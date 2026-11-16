@@ -5,7 +5,7 @@ import { sanitizeName } from '../remote/validate';
 import { Connection, type ConnState } from './Connection';
 import { InputModel, type TapKey } from './InputModel';
 import { FloatingStick, type StickOutput } from './FloatingStick';
-import { glyph } from './glyphs';
+import { glyph, type GlyphName } from './glyphs';
 import { goFullscreen, isApp, keepAwake, store, vibrate, wsUrl } from './device';
 
 const K_NAME = 'me.remote.name';
@@ -179,7 +179,7 @@ export class ControllerApp {
 
   private applyCtxScreen(): void {
     const s = this.ctx?.screen ?? 'lobby';
-    const next: Screen = s === 'lobby' || s === 'menu' ? 'lobby' : s === 'paused' ? 'paused' : 'play';
+    const next: Screen = s === 'lobby' || s === 'menu' || s === 'result' ? 'lobby' : s === 'paused' ? 'paused' : 'play';
     if (next !== 'play') this.stick.reset();
     this.setScreen(next);
   }
@@ -225,6 +225,56 @@ export class ControllerApp {
     b.addEventListener('pointerleave', release);
     // Teclado / accesibilidad (Enter o Espacio sobre el botón enfocado).
     b.addEventListener('click', (e) => { if (e.detail === 0 && can()) { this.pressed(key); after?.(); } });
+  }
+
+  /** Flecha de la cruceta: mientras se mantiene apretada manda el stick en esa dirección (el tele
+   *  mueve el foco una vez y, si se sigue apretando, repite, igual que con el control remoto). */
+  private bindHold(b: HTMLButtonElement, dx: number, dy: number): void {
+    const ids = new Set<number>();
+    const release = (e: PointerEvent): void => {
+      if (!ids.delete(e.pointerId) || ids.size > 0) return;
+      b.classList.remove('is-down');
+      this.model.setStick(0, 0);
+      this.flush();
+    };
+    b.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      ids.add(e.pointerId);
+      b.classList.add('is-down');
+      this.model.setStick(dx, dy);
+      vibrate(10);
+      this.flush();
+    });
+    b.addEventListener('pointerup', release);
+    b.addEventListener('pointercancel', release);
+    b.addEventListener('pointerleave', release);
+  }
+
+  /** Los mismos botones que muestra el tele (pausa, menús, resultados): tocar uno lo aprieta allá. */
+  private buildMenu(menu: NonNullable<ControllerContext['menu']>): HTMLElement {
+    const items = menu.items.map((it, i) => button(`c-menu-btn${it.f ? ' is-focus' : ''}`,
+      [el('span', { text: it.l })], () => {
+        if (this.conn.sendPick(menu.v, i)) vibrate(16);
+      }));
+    return el('div', `c-menu${items.length > 6 ? ' is-many' : ''}`, items);
+  }
+
+  /** Cruceta para manejar los menús del tele desde la tablet: flechas, Aceptar y (opcional) Atrás. */
+  private buildDpad(okLabel: string, withBack: boolean): HTMLElement {
+    const arrow = (g: GlyphName, dx: number, dy: number, label: string): HTMLButtonElement => {
+      const b = button(`c-dpad-btn c-dpad-${g}`, [glyph(g, 40)], () => {}, { 'aria-label': label });
+      this.bindHold(b, dx, dy);
+      return b;
+    };
+    const ok = button('c-dpad-btn c-dpad-ok', [el('span', { text: okLabel })], () => {}, { 'aria-label': okLabel });
+    this.bindPress(ok, 'action', () => true);
+    const pad = el('div', 'c-dpad', [
+      arrow('up', 0, -1, 'Arriba'), arrow('left', -1, 0, 'Izquierda'), ok, arrow('right', 1, 0, 'Derecha'), arrow('down', 0, 1, 'Abajo'),
+    ]);
+    if (!withBack) return pad;
+    const back = button('c-btn c-btn-secondary c-dpad-back', [icon('back', 22), el('span', { text: 'Atrás' })], () => {});
+    this.bindPress(back, 'pause', () => true);
+    return el('div', 'c-dpad-wrap', [pad, back]);
   }
 
   private pressed(key: TapKey): void {
@@ -394,16 +444,19 @@ export class ControllerApp {
       case 'lobby': {
         const c = this.ctx;
         const ready = c && c.action.enabled;
-        const readyBtn = ready ? button('c-btn c-btn-primary c-btn-big', [el('span', { text: c!.action.label || '¡Listo!' })], () => this.pressed('action')) : null;
+        // En la sala, el menú y los resultados se maneja el tele desde acá con la cruceta (nadie
+        // tiene que tocar el control remoto). "Atrás" no va en la sala: ahí cerraría el juego.
+        const menu = c?.screen === 'menu' || c?.screen === 'result';
+        // Con la lista de botones del tele se toca directo; sin ella, la cruceta.
+        const pad = c?.menu ? this.buildMenu(c.menu) : ready ? this.buildDpad(c!.action.label || 'Aceptar', menu) : null;
         return el('div', 'c-card is-wide', [
-          el('div', { cls: 'c-badge is-me', text: this.me ? String(this.me.slot + 1) : '?' }),
           el('div', 'c-card-col', [
             el('div', { cls: 'c-eyebrow', text: this.me ? `Jugador ${this.me.slot + 1} · ${this.me.colorName}` : 'Conectado' }),
-            el('h1', { cls: 'c-h', text: `¡Listo, ${this.name}!` }),
+            el('h1', { cls: 'c-h', text: menu ? 'Manejá el tele' : `¡Listo, ${this.name}!` }),
             el('p', { cls: 'c-p', text: c?.objective || 'Mirá el tele: la partida empieza en un momento' }),
             tv ? el('div', 'c-tv', [glyph('tv', 20), el('span', { text: tv })]) : null,
-            readyBtn,
           ]),
+          pad ?? el('div', { cls: 'c-badge is-me', text: this.me ? String(this.me.slot + 1) : '?' }),
         ]);
       }
       case 'paused':
@@ -411,8 +464,9 @@ export class ControllerApp {
           el('div', 'c-badge', [icon('pause', 48)]),
           el('h1', { cls: 'c-h', text: 'Juego en pausa' }),
           el('p', { cls: 'c-p', text: this.ctx?.objective || 'Cuando estén listos, sigan jugando.' }),
+          this.ctx?.menu ? this.buildMenu(this.ctx.menu) : this.buildDpad('Elegir', false),
           el('div', 'c-row', [
-            button('c-btn c-btn-primary c-btn-big', [icon('play', 30), el('span', { text: 'Seguir' })], () => this.pressed('pause')),
+            this.ctx?.menu ? null : button('c-btn c-btn-primary c-btn-big', [icon('play', 30), el('span', { text: 'Seguir' })], () => this.pressed('pause')),
             button('c-btn c-btn-secondary', [glyph('exit', 24), el('span', { text: 'Salir del juego' })], () => { this.conn.leave(); store.set(K_TOKEN, null, true); store.set(K_TOKEN, null); this.me = null; this.renderHeader(); this.setScreen('name'); }),
           ]),
         ]);

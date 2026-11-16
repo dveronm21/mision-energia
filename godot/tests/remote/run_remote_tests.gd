@@ -15,6 +15,12 @@ func _init() -> void:
 	var cases: Array[Array] = [
 		["RemoteHost: sin puente queda inactivo y no rompe", t_inactive],
 		["TvMode: players() saltea los asientos libres (una sola tablet)", t_tv_players],
+		["RemoteHost: avisos de la partida a una tablet o a todas", t_targets],
+		["RemoteHost: botones del menú tocados en la tablet (pick) y menú en el contexto", t_pick],
+		["DuelLink: dos teles se encuentran por anuncio, el de id mayor arbitra", t_duel_link],
+		["DuelLink: anuncios inválidos se ignoran", t_duel_beacon],
+		["DuelMatch: nivel del árbitro, largada juntos y gana el primero en activar", t_duel_match],
+		["DuelMatch: compra fija válida en todos los niveles", t_duel_purchase],
 		["RemoteHost: asigna asientos 0 y 1, colores y token; el tercero recibe full", t_seats],
 		["RemoteHost: reconexión con token dentro de la ventana recupera el asiento", t_resume],
 		["RemoteHost: fuera de la ventana el asiento se libera y el token ya no sirve", t_expired],
@@ -145,6 +151,158 @@ func t_tv_players() -> void:
 	eq(ps[0].name if ps.size() == 1 else "", "Ana", "nombre")
 	tv.host = null
 	tv.free()
+
+
+func t_targets() -> void:
+	var one: Array[int] = RemoteHost.targets(1)
+	eq(one, [1] as Array[int], "solo a quien lo provocó")
+	var all: Array[int] = RemoteHost.targets(-1)
+	eq(all, RemoteHost.SLOTS, "clima y noche: a todas")
+	all.append(9)
+	eq(RemoteHost.SLOTS.size(), 2, "no toca la constante")
+
+
+func t_pick() -> void:
+	var s := setup()
+	var a := s.bridge.connect_client(); a.hello("Ana")
+	s.host.update()
+	a.send({"t": "pick", "v": 77, "i": 2})
+	a.send({"t": "pick", "v": 0, "i": 1})      # versión inválida
+	a.send({"t": "pick", "v": 5, "i": 99})     # fuera de rango
+	a.send({"t": "pick", "v": 5, "i": -1})
+	a.send_raw('{"t":"pick","v":"x","i":1}')
+	s.host.update()
+	var picks: Array = s.host.take_picks(0)
+	eq(picks.size(), 1, "solo el pick válido")
+	eq(picks[0] if picks.size() == 1 else {}, {"v": 77, "i": 2}, "con su versión y posición")
+	eq(s.host.take_picks(0).size(), 0, "se leen una sola vez")
+	eq(s.host.take_picks(1).size(), 0, "el otro asiento no tiene nada")
+	var menu := {"v": 3, "items": [{"l": "Seguir jugando", "f": true}, {"l": "Reiniciar nivel"}]}
+	var parsed: Dictionary = RemoteValidate.parse_server_msg(JSON.stringify({"t": "ctx", "c": ctx("Aceptar", "paused").merged({"menu": menu})}))
+	eq(parsed.get("c", {}).get("menu", {}), menu, "el menú pasa la validación del contexto")
+	eq(RemoteValidate.sanitize_menu({"v": 1, "items": [{"l": 5}]}), {}, "menú mal formado se descarta")
+	eq(String(RemoteValidate.sanitize_menu({"v": 1, "items": [{"l": "x".repeat(80)}]})["items"][0]["l"]).length(), 32, "textos recortados")
+
+
+func _duel_pair() -> Array[DuelLink]:
+	var a := DuelLink.new("Ana", "aaaa")
+	var b := DuelLink.new("Beto", "bbbb")
+	for l: DuelLink in [a, b]:
+		l.bind_address = "127.0.0.1"
+		l.beacon_address = "127.0.0.1"
+	a.port = 18867; a.beacon_port = 18868; a.beacon_targets = [18869] as Array[int]
+	b.port = 18877; b.beacon_port = 18869; b.beacon_targets = [18868] as Array[int]
+	eq(a.start(), OK, "A escucha")
+	eq(b.start(), OK, "B escucha")
+	return [a, b]
+
+
+## Hace correr los dos enlaces hasta que `cond` se cumpla (o ~3 s). Devuelve lo que recibió cada uno.
+func _duel_pump(links: Array[DuelLink], cond: Callable) -> Array[Array]:
+	var got: Array[Array] = [[], []]
+	for _i: int in 300:
+		for k: int in links.size():
+			got[k].append_array(links[k].poll(0.02))
+		if cond.call(got):
+			break
+		OS.delay_msec(10)
+	return got
+
+
+func t_duel_link() -> void:
+	var ls := _duel_pair()
+	var a := ls[0]
+	var b := ls[1]
+	var got := _duel_pump(ls, func(_g: Array[Array]) -> bool: return a.is_connected_to_peer() and b.is_connected_to_peer())
+	ok(a.is_connected_to_peer() and b.is_connected_to_peer(), "se conectaron solos")
+	ok(not a.is_referee and b.is_referee, "arbitra el de id mayor (B)")
+	eq(a.peer_name, "Beto", "A conoce el nombre de B")
+	eq(b.peer_name, "Ana", "B conoce el nombre de A")
+	ok(got[0].any(func(m: Dictionary) -> bool: return m["t"] == "_connected"), "evento de conexión")
+	b.send({"t": "setup", "level": "casa"})
+	got = _duel_pump(ls, func(g: Array[Array]) -> bool: return g[0].any(func(m: Dictionary) -> bool: return m["t"] == "setup"))
+	var setups: Array = got[0].filter(func(m: Dictionary) -> bool: return m["t"] == "setup")
+	eq(setups.size(), 1, "A recibe el setup una vez")
+	eq(String(setups[0].get("level", "")) if setups.size() == 1 else "", "casa", "con su contenido")
+	a.stop()
+	got = _duel_pump([b], func(g: Array[Array]) -> bool: return g[0].any(func(m: Dictionary) -> bool: return m["t"] == "_lost"))
+	ok(got[0].any(func(m: Dictionary) -> bool: return m["t"] == "_lost"), "B se entera cuando A sale")
+	eq(b.state, DuelLink.State.SEARCHING, "B vuelve a buscar")
+	b.stop()
+
+
+func t_duel_beacon() -> void:
+	eq(DuelLink.parse_beacon("hola"), {}, "sin prefijo")
+	eq(DuelLink.parse_beacon(DuelLink.BEACON_PREFIX + "{"), {}, "JSON roto")
+	eq(DuelLink.parse_beacon(DuelLink.BEACON_PREFIX + '{"id":"x","port":0}'), {}, "puerto inválido")
+	var b: Dictionary = DuelLink.parse_beacon(DuelLink.BEACON_PREFIX + '{"id":"x","name":"TV","port":8767}')
+	eq(b.get("port", 0), 8767, "anuncio válido")
+
+
+func _match_step(ms: Array[DuelMatch], dt: float, frames: int = 1) -> Array[Array]:
+	var ev: Array[Array] = [[], []]
+	for _i: int in frames:
+		for k: int in 2:
+			ev[k].append_array(ms[k].update(dt))
+		OS.delay_msec(8)
+	return ev
+
+
+func _match_until(ms: Array[DuelMatch], cond: Callable) -> void:
+	for _i: int in 300:
+		_match_step(ms, 0.0)
+		if cond.call():
+			return
+
+
+func t_duel_match() -> void:
+	var ls := _duel_pair()
+	var guest := DuelMatch.new(ls[0])
+	var ref := DuelMatch.new(ls[1])
+	var ms: Array[DuelMatch] = [guest, ref]
+	_match_until(ms, func() -> bool: return guest.phase == DuelMatch.Phase.LOBBY and ref.phase == DuelMatch.Phase.LOBBY)
+	eq(ref.phase, DuelMatch.Phase.LOBBY, "árbitro en la sala")
+	ok(ref.is_referee() and not guest.is_referee(), "roles")
+	guest.choose_level("parque")
+	eq(guest.phase, DuelMatch.Phase.LOBBY, "el invitado no elige nivel")
+	ref.choose_level("escuela")
+	_match_until(ms, func() -> bool: return guest.phase == DuelMatch.Phase.SETUP)
+	eq(guest.level_id, "escuela", "el invitado recibe el nivel")
+	eq(guest.purchase().describe(), ref.purchase().describe(), "misma compra")
+	ref.set_ready()
+	_match_step(ms, 0.0, 5)
+	eq(ref.phase, DuelMatch.Phase.SETUP, "con uno solo listo no larga")
+	guest.set_ready()
+	_match_until(ms, func() -> bool: return guest.phase == DuelMatch.Phase.COUNTDOWN and ref.phase == DuelMatch.Phase.COUNTDOWN)
+	eq(guest.phase, DuelMatch.Phase.COUNTDOWN, "cuenta regresiva en los dos")
+	var ev := _match_step(ms, 1.1, 3)
+	ok(ev[0].has(&"go") and ev[1].has(&"go"), "largan juntos")
+	guest.report_progress({"panels": 2, "total": 4})
+	_match_until(ms, func() -> bool: return not ref.peer_progress.is_empty())
+	eq(ref.peer_progress.get("panels", 0), 2, "el árbitro ve el avance del rival")
+	_match_step(ms, 0.5, 4)
+	guest.report_done()
+	_match_until(ms, func() -> bool: return ref.phase == DuelMatch.Phase.FINISHED and guest.phase == DuelMatch.Phase.FINISHED)
+	eq(guest.winner, DuelMatch.WIN_ME, "el invitado ganó")
+	eq(ref.winner, DuelMatch.WIN_PEER, "el árbitro sabe que perdió")
+	ok(absf(guest.win_sec - ref.win_sec) < 0.001 and guest.win_sec > 1.0, "mismo tiempo en las dos pantallas")
+	ref.report_done()
+	eq(ref.winner, DuelMatch.WIN_PEER, "llegar segundo no cambia nada")
+	ref.back_to_lobby()
+	_match_until(ms, func() -> bool: return guest.phase == DuelMatch.Phase.LOBBY)
+	eq(guest.phase, DuelMatch.Phase.LOBBY, "revancha: los dos a la sala")
+	eq(guest.winner, &"", "sin ganador")
+	ls[0].stop()
+	ls[1].stop()
+
+
+func t_duel_purchase() -> void:
+	var cat := LevelCatalog.new()
+	for l: LevelDefinition in cat.all():
+		ok(DuelMatch.FIXED_PURCHASE.has(l.id), "compra para " + l.id)
+		var p := DuelMatch.fixed_purchase(l.id)
+		ok(p.panels >= l.min_panels and p.panels <= l.max_panels(), "paneles en rango " + l.id)
+		ok(cat.cost(l, p) <= l.budget, "entra en el presupuesto " + l.id)
 
 
 func t_seats() -> void:

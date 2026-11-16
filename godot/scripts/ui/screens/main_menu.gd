@@ -76,6 +76,10 @@ func _init(deps: MainMenuDeps) -> void:
 		if c is Label:
 			(c as Label).add_theme_font_size_override("font_size", 30)
 	actions.add_child(_play)
+	if deps.on_duel.is_valid():
+		var duel: Button = UiCommon.action_button("Duelo", deps.on_duel, &"secondary", &"bolt", true)
+		duel.custom_minimum_size.y = 64
+		actions.add_child(duel)
 
 	var tiles: HBoxContainer = HBoxContainer.new()
 	tiles.add_theme_constant_override("separation", 10)

@@ -313,6 +313,7 @@ func _build() -> void:
 	back_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	back_button.pressed.connect(func() -> void: back_requested.emit())
 	back_button.visible = show_back
+	back_button.set_meta(MenuMirror.SKIP_META, true) # en la sala cierra el juego: solo desde el tele
 	actions.add_child(back_button)
 	_hint = Label.new()
 	LobbyStyle.style_label(_hint, "nunito-800", 2.9, LobbyStyle.MUTED)

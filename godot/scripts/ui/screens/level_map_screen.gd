@@ -145,6 +145,8 @@ func _build_node(lv: LevelDefinition, p: LevelProgress, unlocked: bool, is_next:
 	else:
 		bubble_center.add_child(HudIcon.new(&"lock", 30.0, UiTheme.PAPER_2))
 	bubble.add_child(bubble_center)
+	# Nombre del botón en la tablet (en el tele se ve el número y el nombre abajo).
+	bubble.set_meta(MenuMirror.LABEL_META, "Nivel %d · %s%s" % [lv.order, lv.name, "" if unlocked else " (bloqueado)"])
 	if unlocked:
 		if _deps.on_play.is_valid():
 			bubble.pressed.connect(_deps.on_play.bind(lv.id))
