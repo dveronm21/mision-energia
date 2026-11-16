@@ -5,6 +5,10 @@ extends RefCounted
 ## A diferencia de la web no hace falta un `ModelFactory`: usa directo los visuales ya
 ## portados (`PanelVisual`, `CrateVisual`, `VisualMaterials`).
 
+## Separación de las manos (mitad, en el espacio de `carry_anchor`) al cargar un cajón o un panel.
+const CRATE_GRIP_X: float = 0.19
+const PANEL_GRIP_X: float = 0.32
+
 var _rig: WorkerVisual
 var _state: HandsState = HandsState.free_hands()
 var _carried: Node3D
@@ -52,11 +56,15 @@ func carry(item_kind: StringName, faulty: bool = false) -> void:
 		var p: PanelVisual = PanelVisual.new()
 		obj = p
 		obj.position = Vector3(0, 0.02, 0)
+		# Manos abajo del panel, a los costados de la cabeza.
+		_rig.set_carry_grip(Vector3(PANEL_GRIP_X, 0.0, 0.0), Vector3(-PANEL_GRIP_X, 0.0, 0.0))
 	else:
 		var c: CrateVisual = CrateVisual.new(item_kind)
 		c.scale = Vector3.ONE * 0.55
 		c.position = Vector3(0, -0.06, 0)
 		obj = c
+		# Manos debajo del cajón, cerca de las esquinas (el fondo queda en y ≈ -0,07).
+		_rig.set_carry_grip(Vector3(CRATE_GRIP_X, -0.075, 0.0), Vector3(-CRATE_GRIP_X, -0.075, 0.0))
 	_rig.carry_anchor.add_child(obj)
 	_carried = obj
 
@@ -81,6 +89,7 @@ func clear() -> void:
 		_carried.get_parent().remove_child(_carried)
 		_carried.queue_free()
 		_carried = null
+	_rig.clear_carry_grip()
 	_meter.visible = false
 	_state = HandsState.free_hands()
 

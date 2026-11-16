@@ -205,6 +205,12 @@ func sfx(sfx_name: String) -> void:
 	_d.audio.play(sfx_name)
 
 
+## La mano derecha del técnico activo va hasta un punto de `PlantWorld` (borne, soporte, batería).
+func _reach(world_local: Vector3) -> void:
+	if _world.is_inside_tree():
+		_rig.reach(_world.to_global(world_local))
+
+
 func take_from_pallet() -> void:
 	var faulty: bool = _world.pallet.take()
 	_hands.carry(&"panel", faulty)
@@ -225,6 +231,7 @@ func install_panel(m: Mount) -> void:
 		return
 	_hands.clear()
 	m.install(h.item_faulty)
+	_reach(m.visual.position + Vector3(0, 0.8, 0))
 	_ensure_row_wire(m.row)
 	sfx("place")
 	WorldFx.dust(_world, m.visual.position)
@@ -242,6 +249,7 @@ func install_protection() -> void:
 	_hands.clear()
 	_world.protection.install()
 	_world.link_protection()
+	_reach(_world.protection.terminal)
 	sfx("place")
 	WorldFx.sparks(_world, _world.protection.terminal, 18)
 	toast("Protección instalada: corta el circuito si hay una falla.", &"good")
@@ -256,6 +264,7 @@ func install_battery(i: int) -> void:
 		return
 	_hands.clear()
 	slot.install()
+	_reach(slot.position + Vector3(0, 0.5, 0))
 	slot.set_charge(_level.start_soc)
 	_world.colliders.add(slot.position.x, slot.position.z, 0.5, 0.32)
 	sfx("place")
@@ -274,6 +283,7 @@ func install_kit(_row: int) -> void:
 
 func take_cable(color: StringName, from: StringName, point: Vector3) -> void:
 	_hands.take_cable(color, from, point)
+	_reach(point)
 	sfx("pick")
 	toast("Llevá el %s hasta su equipo." % CableNetwork.NAMES.get(color, "cable"))
 	_changed()
@@ -301,6 +311,7 @@ func connect_cable(to: StringName) -> void:
 	sfx("spark")
 	if pts.size() > 0:
 		WorldFx.sparks(_world, pts[pts.size() - 1])
+		_reach(pts[pts.size() - 1])
 	_rig.play_gesture(&"thumbs")
 	toast("¡Bien! Conectaste el %s." % CableNetwork.NAMES.get(h.cable_color, "cable"), &"good")
 	_changed()

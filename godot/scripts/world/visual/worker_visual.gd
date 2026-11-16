@@ -3,6 +3,7 @@ extends Node3D
 ## Técnico con casco y chaleco: jerarquía rígida (hips, torso, head, arm_l/forearm_l, arm_r/forearm_r,
 ## leg_l/shin_l, leg_r/shin_r) con animación procedural de caminar, respirar y poses de brazos.
 ## Port directo de ModelFactory.createWorker().animate() de la versión web (mismos ángulos y tiempos).
+## Encima de eso: IK de las manos (sostienen la carga y alcanzan bornes) e inercia de la carga.
 ##
 ##   var w := WorkerVisual.new()
 ##   w.speed = 0.6; w.pose = WorkerVisual.Pose.CARRY      # se anima solo en _process
@@ -40,12 +41,42 @@ var _gesture: StringName = &""
 var _g_time := 0.0
 var _g_len := 0.0
 var _g_loop := false
+## Puntos de agarre [izquierda, derecha] en el espacio de `carry_anchor` (vacío = sin agarre).
+var _grip: Array[Vector3] = []
+var _grip_w := 0.0
+## Punto de la mano en el espacio de cada antebrazo [izquierda, derecha].
+var _hand_rest: Array[Vector3] = []
+## Alcance en curso: lado (0 = izquierda, 1 = derecha, -1 = ninguno), punto del mundo y tiempos.
+var _reach_side := -1
+var _reach_point := Vector3.ZERO
+var _reach_t := 0.0
+var _reach_len := 0.0
+var _anchor_rest := Vector3.ZERO
+var _sway: SecondOrder
 
 ## Gestos: festejo (brazos arriba con saltito), "uy" (mano a la cabeza y sacudida de cabeza),
 ## "dale" (pulgar arriba con el brazo derecho) y baile de victoria (en bucle).
 const GESTURE_LEN: Dictionary[StringName, float] = {
 	&"cheer": 1.3, &"oops": 1.1, &"thumbs": 0.9, &"victory": 1.6,
 }
+
+## IK de las manos (`TwoBoneIk`): al cargar, las manos sostienen la carga desde abajo; con
+## `reach()` una mano va hasta un punto del mundo (borne, soporte, batería) y vuelve.
+## Velocidad de mezcla del agarre (1/s) y tiempos de entrada/salida del alcance.
+const GRIP_BLEND_RATE := 9.0
+const REACH_IN := 0.18
+const REACH_OUT := 0.3
+## Hacia dónde apuntan los codos (x se espeja por lado): al cargar, afuera y un poco adelante;
+## al alcanzar, afuera y abajo.
+const CARRY_POLE := Vector3(1.0, 0.0, 0.35)
+const REACH_POLE := Vector3(0.6, -1.0, -0.3)
+
+## Inercia de la carga (`SecondOrder`): se atrasa y se inclina al arrancar, frenar y doblar.
+const SWAY_F := 2.6
+const SWAY_Z := 0.42
+const SWAY_MAX := 0.14
+const SWAY_SHIFT := 0.5
+const SWAY_TILT := 1.3
 
 
 func _init(helmet: Color = VisualMaterials.C_SUN, vest: Color = VisualMaterials.C_ORANGE) -> void:
@@ -67,6 +98,9 @@ func _init(helmet: Color = VisualMaterials.C_SUN, vest: Color = VisualMaterials.
 			gi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	carry_anchor = model.find_child("carry_anchor", true, false) as Node3D
 	hand_anchor = model.find_child("hand_r", true, false) as Node3D
+	_anchor_rest = carry_anchor.position
+	var hand_r := hand_anchor.position
+	_hand_rest = [Vector3(-hand_r.x, hand_r.y, hand_r.z), hand_r]
 	_helmet_mat = ModelLibrary.own_material(model.find_child("helmet", true, false) as MeshInstance3D) as StandardMaterial3D
 	_vest_mat = ModelLibrary.own_material(model.find_child("vest", true, false) as MeshInstance3D) as StandardMaterial3D
 	# sombra de contacto (mancha suave): asienta al personaje aun sin sombras dinámicas
@@ -113,6 +147,86 @@ func stop_gesture() -> void:
 
 func gesture() -> StringName:
 	return _gesture
+
+
+## Dónde sostiene las manos lo que carga (espacio de `carry_anchor`). La carga arranca quieta.
+func set_carry_grip(left: Vector3, right: Vector3) -> void:
+	_grip = [left, right]
+	_sway = null
+
+
+func clear_carry_grip() -> void:
+	_grip = []
+
+
+## Lleva una mano hasta `world_point`, la deja `hold` segundos y la devuelve. Mientras carga
+## algo no hace nada (las manos están ocupadas).
+func reach(world_point: Vector3, right_hand: bool = true, hold: float = 0.3) -> void:
+	_reach_side = 1 if right_hand else 0
+	_reach_point = world_point
+	_reach_t = 0.0
+	_reach_len = REACH_IN + hold + REACH_OUT
+
+
+## Peso actual del agarre (0..1), para tests y depuración.
+func grip_weight() -> float:
+	return _grip_w
+
+
+func _reach_weight() -> float:
+	if _reach_side < 0:
+		return 0.0
+	return clampf(_reach_t / REACH_IN, 0.0, 1.0) * clampf((_reach_len - _reach_t) / REACH_OUT, 0.0, 1.0)
+
+
+## La carga sigue a su lugar con un resorte: se atrasa, se corre y se inclina un poco.
+func _update_sway(dt: float) -> void:
+	if carry_anchor == null or not carry_anchor.is_inside_tree():
+		return
+	var torso := carry_anchor.get_parent() as Node3D
+	var rest_world: Vector3 = torso.global_transform * _anchor_rest
+	if _sway == null or _sway.value.distance_to(rest_world) > 1.0:
+		_sway = SecondOrder.new(SWAY_F, SWAY_Z, 0.0, rest_world)
+	var p: Vector3 = _sway.update(dt, rest_world)
+	var off: Vector3 = (torso.global_basis.orthonormalized().inverse() * (p - rest_world)).limit_length(SWAY_MAX)
+	carry_anchor.position = _anchor_rest + off * SWAY_SHIFT
+	carry_anchor.rotation = Vector3(off.z * SWAY_TILT, 0.0, -off.x * SWAY_TILT)
+
+
+## Corrige brazos y antebrazos con IK encima de la pose procedural, mezclando por peso.
+func _apply_hand_ik(dt: float, p: Pose) -> void:
+	var carrying := p == Pose.CARRY and _grip.size() == 2
+	_grip_w = EquipmentVisual.damp(_grip_w, 1.0 if carrying else 0.0, GRIP_BLEND_RATE, dt)
+	if _reach_side >= 0:
+		_reach_t += dt
+		if _reach_t >= _reach_len:
+			_reach_side = -1
+	var reach_w := _reach_weight() * (1.0 - _grip_w)
+	var torso: Node3D = _bones.get(&"torso")
+	if torso == null:
+		return
+	for side: int in 2:
+		var arm: Node3D = _bones.get(&"arm_l" if side == 0 else &"arm_r")
+		var forearm: Node3D = _bones.get(&"forearm_l" if side == 0 else &"forearm_r")
+		if arm == null or forearm == null:
+			continue
+		var mirror := Vector3(1.0 if side == 0 else -1.0, 1.0, 1.0)
+		var w := 0.0
+		var target := Vector3.ZERO
+		var pole := Vector3.ZERO
+		if _grip_w > 0.001 and _grip.size() == 2:
+			w = _grip_w
+			target = carry_anchor.transform * _grip[side]
+			pole = CARRY_POLE * mirror
+		elif side == _reach_side and reach_w > 0.001 and torso.is_inside_tree():
+			w = reach_w
+			target = torso.to_local(_reach_point)
+			pole = REACH_POLE * mirror
+		if w <= 0.001:
+			continue
+		var r: Array[Vector3] = TwoBoneIk.solve(arm.position, forearm.position, _hand_rest[side], target, pole)
+		arm.rotation = arm.rotation.lerp(r[0], w)
+		forearm.rotation = forearm.rotation.lerp(r[1], w)
 
 
 ## Peso de mezcla del gesto: entra en 0,15 s y sale en los últimos 0,25 s.
@@ -244,6 +358,8 @@ func animate(dt: float, spd: float, p: Pose) -> void:
 		var n: Node3D = _bones.get(b)
 		if n != null:
 			n.rotation = cur
+	_update_sway(dt)
+	_apply_hand_ik(dt, p)
 	var hips_node: Node3D = _bones.get(&"hips")
 	if hips_node != null:
 		hips_node.position.y = HIP_Y + (absf(c) * 0.045 - 0.03) * amp + breath * 0.003 * still + hop
