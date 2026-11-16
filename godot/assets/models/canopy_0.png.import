@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://qxteyrxpfnbf"
-path="res://.godot/imported/canopy_0.png-1b471a08a93e5d8d7dde66b6c73512b7.ctex"
+path.s3tc="res://.godot/imported/canopy_0.png-1b471a08a93e5d8d7dde66b6c73512b7.s3tc.ctex"
+path.etc2="res://.godot/imported/canopy_0.png-1b471a08a93e5d8d7dde66b6c73512b7.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "9fd0337fe563b6775cfbe63669bb9008"
@@ -14,11 +16,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/canopy_0.png"
-dest_files=["res://.godot/imported/canopy_0.png-1b471a08a93e5d8d7dde66b6c73512b7.ctex"]
+dest_files=["res://.godot/imported/canopy_0.png-1b471a08a93e5d8d7dde66b6c73512b7.s3tc.ctex", "res://.godot/imported/canopy_0.png-1b471a08a93e5d8d7dde66b6c73512b7.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

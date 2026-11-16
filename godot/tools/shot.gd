@@ -105,7 +105,8 @@ func _run() -> void:
 		var img := root.get_texture().get_image()
 		var path := OUT_DIR + n + suffix + ".png"
 		img.save_png(path)
-		print("SHOT %-16s q=%d calls=%d (main %d / objs %d, shadow %d) prims=%d objects=%d -> %s" % [n, int(params.get("quality", 1)), int(calls), vis_calls, vis_objs, sh_calls, int(prims), int(objs), path])
+		var tex_mb := Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED) / 1048576.0
+		print("SHOT %-16s q=%d calls=%d (main %d / objs %d, shadow %d) prims=%d objects=%d tex=%.1fMB -> %s" % [n, int(params.get("quality", 1)), int(calls), vis_calls, vis_objs, sh_calls, int(prims), int(objs), tex_mb, path])
 		sc.queue_free()
 		await process_frame
 	quit()

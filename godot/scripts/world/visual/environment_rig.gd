@@ -23,6 +23,14 @@ const INSTANCES_PATH := "res://assets/models/env_instances.json"
 const SCATTER: Array[StringName] = [&"rocks", &"jarillas", &"grass", &"algarrobos", &"alamos", &"vinedo"]
 ## Los que no proyectan sombra (pasto) o sólo en calidad alta.
 const NO_SHADOW: Array[StringName] = [&"grass", &"rocks"]
+## Vegetación chica, casi toda lejos (las jarillas solas son ~39 000 triángulos): va en parcelas de
+## `CHUNK_SIZE` para que la cámara descarte las que no ve y desaparezca pasados `SMALL_RANGE` metros
+## (`visibility_range_end`, medido al centro de la parcela). Los árboles quedan enteros: son pocos y
+## dibujan el fondo.
+const CHUNKED: Array[StringName] = [&"rocks", &"jarillas", &"grass"]
+const CHUNK_SIZE := 32.0
+const SMALL_RANGE := 80.0
+const SMALL_RANGE_MARGIN := 4.0
 
 const DAY_TOP := Color("#3d8fe0")
 const DAY_HORIZON := Color("#cfe8f2")
@@ -58,8 +66,9 @@ var gamma_additive_fix := RenderingServer.get_current_rendering_method() == "gl_
 var ambient_day_scale := 1.0
 
 var _sky_mat: ShaderMaterial
-var _scatter: Dictionary[StringName, MultiMeshInstance3D] = {}
-var _scatter_full: Dictionary[StringName, int] = {}
+## Mallas de cada especie (una sola, o una por parcela) y cuántas instancias tiene cada malla.
+var _scatter: Dictionary[StringName, Array] = {}
+var _scatter_full: Dictionary[MultiMeshInstance3D, int] = {}
 var _dust_mat: StandardMaterial3D
 var _night := 0.0
 var _time := 0.0
@@ -209,13 +218,13 @@ func set_quality(q: int) -> void:
 	environment.glow_enabled = quality == 2
 	var k := 0.6 if quality == 0 else 1.0
 	for n: StringName in _scatter:
-		var mmi := _scatter[n]
-		var full := _scatter_full[n]
-		mmi.multimesh.visible_instance_count = full if n == &"vinedo" else int(full * k)
 		var cast := quality > 0 and not NO_SHADOW.has(n)
 		if n == &"vinedo" or n == &"jarillas":
 			cast = quality == 2
-		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if cast else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		for mmi: MultiMeshInstance3D in _scatter[n]:
+			var full := _scatter_full[mmi]
+			mmi.multimesh.visible_instance_count = full if n == &"vinedo" else int(full * k)
+			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if cast else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	dust.amount = [300, 600, 1000][quality]
 	if is_inside_tree():
 		_apply_viewport_quality()
@@ -298,11 +307,7 @@ func _build_scatter() -> void:
 		var count: int = entry["count"]
 		var xf: Array = entry["xf"]
 		var col: Array = entry.get("col", [])
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.use_colors = not col.is_empty()
-		mm.mesh = ModelLibrary.first_mesh(StringName("env_" + String(n)))
-		mm.instance_count = count
+		var mesh := ModelLibrary.first_mesh(StringName("env_" + String(n)))
 		# Orden aleatorio estable: al recortar instancias por calidad se reparten parejo por el mapa.
 		var order := range(count)
 		var rng := RandomNumberGenerator.new()
@@ -312,22 +317,46 @@ func _build_scatter() -> void:
 			var tmp: int = order[i]
 			order[i] = order[j]
 			order[j] = tmp
-		for slot: int in count:
-			var i: int = order[slot]
+		# Parcelas (celda de la grilla → instancias, en el orden mezclado); sin parcelas, una sola.
+		var chunked := CHUNKED.has(n)
+		var cells: Dictionary[Vector2i, Array] = {}
+		for i: int in order:
 			var o := i * 12
-			var basis := Basis(
-				Vector3(xf[o], xf[o + 1], xf[o + 2]),
-				Vector3(xf[o + 3], xf[o + 4], xf[o + 5]),
-				Vector3(xf[o + 6], xf[o + 7], xf[o + 8]))
-			mm.set_instance_transform(slot, Transform3D(basis, Vector3(xf[o + 9], xf[o + 10], xf[o + 11])))
-			if mm.use_colors:
-				mm.set_instance_color(slot, Color(col[i * 3], col[i * 3 + 1], col[i * 3 + 2]))
-		var mmi := MultiMeshInstance3D.new()
-		mmi.name = String(n)
-		mmi.multimesh = mm
-		add_child(mmi)
-		_scatter[n] = mmi
-		_scatter_full[n] = count
+			var cell := Vector2i(floori(float(xf[o + 9]) / CHUNK_SIZE), floori(float(xf[o + 11]) / CHUNK_SIZE)) if chunked else Vector2i.ZERO
+			if not cells.has(cell):
+				cells[cell] = []
+			cells[cell].append(i)
+		var mmis: Array = []
+		for cell: Vector2i in cells:
+			var ids: Array = cells[cell]
+			var center := Vector3((cell.x + 0.5) * CHUNK_SIZE, 0.0, (cell.y + 0.5) * CHUNK_SIZE) if chunked else Vector3.ZERO
+			var mm := MultiMesh.new()
+			mm.transform_format = MultiMesh.TRANSFORM_3D
+			mm.use_colors = not col.is_empty()
+			mm.mesh = mesh
+			mm.instance_count = ids.size()
+			for slot: int in ids.size():
+				var i: int = ids[slot]
+				var o := i * 12
+				var basis := Basis(
+					Vector3(xf[o], xf[o + 1], xf[o + 2]),
+					Vector3(xf[o + 3], xf[o + 4], xf[o + 5]),
+					Vector3(xf[o + 6], xf[o + 7], xf[o + 8]))
+				var pos := Vector3(xf[o + 9], xf[o + 10], xf[o + 11]) - center
+				mm.set_instance_transform(slot, Transform3D(basis, pos))
+				if mm.use_colors:
+					mm.set_instance_color(slot, Color(col[i * 3], col[i * 3 + 1], col[i * 3 + 2]))
+			var mmi := MultiMeshInstance3D.new()
+			mmi.name = String(n) if not chunked else "%s_%d_%d" % [n, cell.x, cell.y]
+			mmi.multimesh = mm
+			mmi.position = center
+			if chunked:
+				mmi.visibility_range_end = SMALL_RANGE
+				mmi.visibility_range_end_margin = SMALL_RANGE_MARGIN
+			add_child(mmi)
+			mmis.append(mmi)
+			_scatter_full[mmi] = ids.size()
+		_scatter[n] = mmis
 
 
 func _build_dust() -> void:

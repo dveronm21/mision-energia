@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://y023m7gblppc"
-path="res://.godot/imported/slab_0.png-43c824d606f90549608703edacffc1a3.ctex"
+path.s3tc="res://.godot/imported/slab_0.png-43c824d606f90549608703edacffc1a3.s3tc.ctex"
+path.etc2="res://.godot/imported/slab_0.png-43c824d606f90549608703edacffc1a3.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "73c1f7a6b75b6a5dfe8c686d61871dfd"
@@ -14,11 +16,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/slab_0.png"
-dest_files=["res://.godot/imported/slab_0.png-43c824d606f90549608703edacffc1a3.ctex"]
+dest_files=["res://.godot/imported/slab_0.png-43c824d606f90549608703edacffc1a3.s3tc.ctex", "res://.godot/imported/slab_0.png-43c824d606f90549608703edacffc1a3.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

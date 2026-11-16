@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bjtvhdipy10vj"
-path="res://.godot/imported/building_0_0.png-dbec3f2981c359fd7b935679b1c5a916.ctex"
+path.s3tc="res://.godot/imported/building_0_0.png-dbec3f2981c359fd7b935679b1c5a916.s3tc.ctex"
+path.etc2="res://.godot/imported/building_0_0.png-dbec3f2981c359fd7b935679b1c5a916.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "4f9ecbdd1febc26ecd9896092d0b2573"
@@ -14,11 +16,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/building_0_0.png"
-dest_files=["res://.godot/imported/building_0_0.png-dbec3f2981c359fd7b935679b1c5a916.ctex"]
+dest_files=["res://.godot/imported/building_0_0.png-dbec3f2981c359fd7b935679b1c5a916.s3tc.ctex", "res://.godot/imported/building_0_0.png-dbec3f2981c359fd7b935679b1c5a916.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

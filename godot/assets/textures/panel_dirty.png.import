@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dpiodt8a6ah77"
-path="res://.godot/imported/panel_dirty.png-2458ac29a8efb6f18d910a01994520bb.ctex"
+path.s3tc="res://.godot/imported/panel_dirty.png-2458ac29a8efb6f18d910a01994520bb.s3tc.ctex"
+path.etc2="res://.godot/imported/panel_dirty.png-2458ac29a8efb6f18d910a01994520bb.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/panel_dirty.png"
-dest_files=["res://.godot/imported/panel_dirty.png-2458ac29a8efb6f18d910a01994520bb.ctex"]
+dest_files=["res://.godot/imported/panel_dirty.png-2458ac29a8efb6f18d910a01994520bb.s3tc.ctex", "res://.godot/imported/panel_dirty.png-2458ac29a8efb6f18d910a01994520bb.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

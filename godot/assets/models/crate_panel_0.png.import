@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bggfvt6s2pkx5"
-path="res://.godot/imported/crate_panel_0.png-3e94faed3010dcd7aac3a0d5205e85ef.ctex"
+path.s3tc="res://.godot/imported/crate_panel_0.png-3e94faed3010dcd7aac3a0d5205e85ef.s3tc.ctex"
+path.etc2="res://.godot/imported/crate_panel_0.png-3e94faed3010dcd7aac3a0d5205e85ef.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "8b701d5d597d5470931d7884e0c88d34"
@@ -14,11 +16,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/crate_panel_0.png"
-dest_files=["res://.godot/imported/crate_panel_0.png-3e94faed3010dcd7aac3a0d5205e85ef.ctex"]
+dest_files=["res://.godot/imported/crate_panel_0.png-3e94faed3010dcd7aac3a0d5205e85ef.s3tc.ctex", "res://.godot/imported/crate_panel_0.png-3e94faed3010dcd7aac3a0d5205e85ef.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

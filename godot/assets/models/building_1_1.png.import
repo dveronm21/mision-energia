@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cr7huqoej6hqo"
-path="res://.godot/imported/building_1_1.png-7855043172f98251da3ac312e3741080.ctex"
+path.s3tc="res://.godot/imported/building_1_1.png-7855043172f98251da3ac312e3741080.s3tc.ctex"
+path.etc2="res://.godot/imported/building_1_1.png-7855043172f98251da3ac312e3741080.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "f082c32c14272b71acbb17d00f1e0e62"
@@ -14,11 +16,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/building_1_1.png"
-dest_files=["res://.godot/imported/building_1_1.png-7855043172f98251da3ac312e3741080.ctex"]
+dest_files=["res://.godot/imported/building_1_1.png-7855043172f98251da3ac312e3741080.s3tc.ctex", "res://.godot/imported/building_1_1.png-7855043172f98251da3ac312e3741080.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
