@@ -15,8 +15,15 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 VARIANT="${1:-}"
-SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/lib/android-sdk}}"
-BS=$(printf '\134'); SDK="${SDK//"$BS"//}"   # Windows: barras invertidas a barras
+# Primer SDK que tenga la plataforma 23. En GitHub, ANDROID_HOME apunta al SDK del runner (sin la
+# 23) y la 23 viene de apt en /usr/lib/android-sdk; en Windows, ANDROID_HOME es el SDK de Studio.
+BS=$(printf '\134')
+SDK=""
+for c in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" /usr/lib/android-sdk; do
+  c="${c//"$BS"//}"   # Windows: barras invertidas a barras
+  if [ -n "$c" ] && [ -f "$c/platforms/android-23/android.jar" ]; then SDK="$c"; break; fi
+done
+[ -n "$SDK" ] || SDK="${ANDROID_HOME:-/usr/lib/android-sdk}"
 ANDROID_JAR="${ANDROID_JAR:-$SDK/platforms/android-23/android.jar}"
 if [ -z "${BT:-}" ]; then
   if [ -d "$SDK/build-tools/debian" ]; then BT="$SDK/build-tools/debian"
