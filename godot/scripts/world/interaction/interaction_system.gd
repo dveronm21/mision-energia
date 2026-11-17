@@ -1,7 +1,7 @@
 class_name InteractionSystem
 extends RefCounted
 ## Junta las acciones de todas las estrategias para el estado de manos actual y elige la más
-## cercana al jugador (y la ficha de "Revisar" más cercana). Equivale a `InteractionSystem.ts`.
+## cercana al jugador (los objetos que se levantan, desde cualquier lado) (y la ficha de "Revisar" más cercana). Equivale a `InteractionSystem.ts`.
 
 const ACTION_RADIUS: float = 2.1
 const INSPECT_RADIUS: float = 3.0
@@ -42,10 +42,12 @@ static func _nearest_action(list: Array[WorldAction], at: Vector3, r: float) -> 
 	var best: WorldAction = null
 	var bd: float = r
 	for a: WorldAction in list:
-		var d: float = Vector2(a.pos.x - at.x, a.pos.z - at.z).length()
+		var d: float = a.distance_from(at)
 		if d < bd:
 			bd = d
 			best = a
+	if best != null:
+		best.face(at)
 	return best
 
 

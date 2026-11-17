@@ -121,6 +121,42 @@ func test_interaction_system_elige_la_accion_mas_cercana() -> void:
 	w.free()
 
 
+func test_los_objetos_se_toman_desde_cualquier_angulo() -> void:
+	var w: PlantWorld = PlantWorld.new(Levels.casa(), Purchase.make(4, 1, false), Callable())
+	var s: FakeSession = FakeSession.new(w)
+	var sys: InteractionSystem = InteractionSystem.new(
+		[PickupProvider.new(s) as ActionProvider],
+		[] as Array[InspectProvider],
+	)
+	check(w.pickups.size() > 0, "el nivel tiene cajones")
+	var crate: Pickup = w.pickups[0]
+	var c: Vector3 = crate.position
+	var front: float = Vector2(crate.approach.x - c.x, crate.approach.z - c.z).length()
+	# Atrás, al costado libre y en diagonal, a la misma distancia que el punto de frente (a la
+	# derecha está el cajón de batería: ahí se toma ese, que queda más cerca).
+	for dir: Vector2 in [Vector2(0, -1), Vector2(-1, 0), Vector2(-0.7071, -0.7071), Vector2(-0.7071, 0.7071)]:
+		var at: Vector3 = Vector3(c.x + dir.x * front, 0.0, c.z + dir.y * front)
+		var pick: InteractionPick = sys.update(HandsState.free_hands(), at)
+		check(pick.action != null and pick.action.id.begins_with("pickup:0:"),
+			"se toma el cajón desde %s" % dir)
+		if pick.action != null and pick.action.id.begins_with("pickup:0:"):
+			check(Vector2(pick.action.pos.x - at.x, pick.action.pos.z - at.z).length() < 0.01,
+				"el aro se dibuja del lado del jugador")
+	# Entre dos cajones gana el más pegado.
+	check(w.pickups.size() > 1, "hay un segundo cajón al lado")
+	var other: Vector3 = w.pickups[1].position
+	var near0: Vector3 = c.lerp(other, 0.35)
+	var pick2: InteractionPick = sys.update(HandsState.free_hands(), near0)
+	check(pick2.action != null and pick2.action.id.begins_with("pickup:0:"), "más pegado al primero, toma ese")
+	var near1: Vector3 = c.lerp(other, 0.65)
+	var pick4: InteractionPick = sys.update(HandsState.free_hands(), near1)
+	check(pick4.action != null and pick4.action.id.begins_with("pickup:1:"), "más pegado al segundo, toma ese")
+	var behind_pallet: Vector3 = w.pallet.visual.position + Vector3(0.0, 0.0, -1.35)
+	var pick3: InteractionPick = sys.update(HandsState.free_hands(), behind_pallet)
+	check(pick3.action != null and pick3.action.id == "pallet", "se toma panel desde atrás del pallet")
+	w.free()
+
+
 func test_inspectables_no_explota_sin_simulacion_corriendo() -> void:
 	var level: LevelDefinition = Levels.casa()
 	var w: PlantWorld = PlantWorld.new(level, Purchase.make(4, 1, false), Callable())

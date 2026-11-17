@@ -19,8 +19,9 @@ func collect(hands: HandsState, out: Array[WorldAction]) -> void:
 		return
 	var w: PlantWorld = _s.world()
 	if w.pallet.remaining() > 0:
-		out.append(WorldAction.new("pallet", "Tomar panel", w.pallet.approach, _s.take_from_pallet))
+		# Desde cualquier lado del pallet o del cajón, no solo de frente.
+		out.append(WorldAction.new("pallet", "Tomar panel", w.pallet.approach, _s.take_from_pallet).around(w.pallet.visual.position))
 	for i: int in w.pickups.size():
 		var p: Pickup = w.pickups[i]
 		var label: String = "Tomar %s" % ITEM_NAME.get(p.kind, String(p.kind))
-		out.append(WorldAction.new("pickup:%d:%s" % [i, p.kind], label, p.approach, _s.take_pickup.bind(p)))
+		out.append(WorldAction.new("pickup:%d:%s" % [i, p.kind], label, p.approach, _s.take_pickup.bind(p)).around(p.position))
