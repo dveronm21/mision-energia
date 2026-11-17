@@ -79,6 +79,7 @@ func _ready() -> void:
 	(hud.alert as AlertBanner).on_resize = _on_alert_resize
 
 	if TvMode.wanted():
+		TvMode.apply_desktop_window()
 		tv = TvMode.new()
 		add_child(tv)
 		tv.start()

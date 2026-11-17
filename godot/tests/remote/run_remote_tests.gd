@@ -727,6 +727,16 @@ func t_net_utils() -> void:
 		{"name": "x", "addresses": ["169.254.3.3", "8.8.8.8"]},
 	])
 	eq(ips, ["192.168.0.23", "10.0.0.5", "172.17.0.1", "8.8.8.8"] as Array[String], "orden")
+	# Windows: nombres GUID con `friendly`; Wi-Fi primero, virtuales y VPN al final, .1 detrás.
+	var win: Array[String] = NetUtils.rank_ipv4([
+		{"name": "{A}", "friendly": "vEthernet (Default Switch)", "addresses": ["172.27.48.1"]},
+		{"name": "{B}", "friendly": "Loopback Pseudo-Interface 1", "addresses": ["127.0.0.1"]},
+		{"name": "{C}", "friendly": "Ethernet 4", "addresses": ["192.168.57.1"]},
+		{"name": "{D}", "friendly": "OpenVPN TAP-Windows6", "addresses": ["10.8.0.6"]},
+		{"name": "{E}", "friendly": "Ethernet", "addresses": ["169.254.146.65", "192.168.88.250"]},
+		{"name": "{F}", "friendly": "Wi-Fi", "addresses": ["192.168.2.232"]},
+	])
+	eq(win, ["192.168.2.232", "192.168.88.250", "192.168.57.1", "10.8.0.6"] as Array[String], "orden en Windows (vEthernet afuera)")
 	eq(NetUtils.best_local_for("192.168.0.50", ["10.0.0.5", "192.168.0.23"] as Array[String]), "192.168.0.23", "misma red")
 	eq(NetUtils.best_local_for("127.0.0.1", ["192.168.0.23"] as Array[String]), "127.0.0.1", "loopback")
 	ok(NetUtils.is_private_ipv4("172.20.1.1") and not NetUtils.is_private_ipv4("172.40.1.1"), "172.16/12")

@@ -4,6 +4,7 @@ name: Compilar y publicar APK
 #   MisionEnergia.apk         juego en el celular (mismo paquete que la 0.3: se instala encima)
 #   MisionEnergiaTV.apk       juego en el tele, modo cooperativo con tablets
 #   MisionEnergiaControl.apk  app de las tablets de feria (Java)
+#   MisionEnergiaTV-Windows.zip  modo TV para una PC con Windows (.exe + LEEME.txt)
 # y se publican en Releases. El QR (.../releases/latest/download/MisionEnergia.apk) no cambia.
 # Además arma MisionEnergia.aab para Google Play (mismo paquete y firma que el APK del celular,
 # sin compras con dinero real): queda como artefacto de la compilación, no en Releases.
@@ -65,7 +66,7 @@ jobs:
           sudo install -m 755 bin/Godot_v${GODOT_VERSION}-stable_linux.x86_64 /usr/local/bin/godot
           T=~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
           mkdir -p "$T"
-          unzip -q -o -j "$TEMPLATES_TPZ" 'templates/android_*' 'templates/version.txt' -d "$T"
+          unzip -q -o -j "$TEMPLATES_TPZ" 'templates/android_*' 'templates/windows_release_x86_64.exe' 'templates/version.txt' -d "$T"
           ls -la "$T"
           godot --version
 
@@ -130,6 +131,14 @@ jobs:
           godot --headless --path . --export-release "Android TV" build/MisionEnergiaTV.apk
           test -s build/MisionEnergiaTV.apk
 
+      - name: Exportar MisionEnergiaTV-Windows.zip (tele con Windows)
+        working-directory: godot
+        run: |
+          godot --headless --path . --export-release "Windows TV" build/MisionEnergiaTV.exe
+          test -s build/MisionEnergiaTV.exe
+          mkdir -p build/win && cp build/MisionEnergiaTV.exe ../docs/windows/LEEME.txt build/win/
+          (cd build/win && zip -q -9 ../MisionEnergiaTV-Windows.zip MisionEnergiaTV.exe LEEME.txt)
+
       - name: Compilar MisionEnergiaControl.apk (tablets, Java)
         env:
           KS_PASS: ${{ secrets.KS_PASS }}
@@ -150,11 +159,14 @@ jobs:
             aapt dump badging "$f" | grep -E "^package:"
           done
           rm -f "$RUNNER_TEMP/release.jks"
+          cp godot/build/MisionEnergiaTV-Windows.zip dist/
 
       - uses: actions/upload-artifact@v4
         with:
           name: MisionEnergia-apks
-          path: dist/*.apk
+          path: |
+            dist/*.apk
+            dist/*.zip
 
       - uses: actions/upload-artifact@v4
         with:
@@ -187,8 +199,8 @@ jobs:
             KIND=(--prerelease --latest=false)
           fi
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/*.apk --clobber
+            gh release upload "$TAG" dist/*.apk dist/*.zip --clobber
           else
-            gh release create "$TAG" dist/*.apk "${KIND[@]}" \
+            gh release create "$TAG" dist/*.apk dist/*.zip "${KIND[@]}" \
               --title "Misión Energía ${TAG#v}" --notes-file docs/RELEASE_NOTES.md
           fi

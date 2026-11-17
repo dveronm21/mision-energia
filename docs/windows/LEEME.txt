@@ -1,0 +1,27 @@
+MISIÓN ENERGÍA TV PARA WINDOWS
+==============================
+
+Es el modo TV del juego para una PC con Windows conectada a la pantalla: hasta 2 jugadores,
+cada uno con su tablet como control.
+
+CÓMO USARLO
+1. Copiá MisionEnergiaTV.exe a la PC (por ejemplo, al Escritorio) y abrilo con doble clic.
+   Abre en pantalla completa. Para salir: Alt+F4.
+2. La primera vez, Windows pregunta si el juego puede usar la red:
+   marcá "Redes privadas" y tocá "Permitir acceso". Sin eso, las tablets no se conectan.
+3. La PC y las tablets tienen que estar en la misma red (Wi-Fi o cable al mismo router).
+   La red de la PC tiene que figurar como "Privada" en Configuración → Red e Internet.
+4. En cada tablet: escaneá el QR de la pantalla o abrí la app Misión Energía Control.
+
+Si Windows muestra "Windows protegió su PC" (SmartScreen): tocá "Más información" → "Ejecutar
+de todas formas". Pasa porque el archivo no está firmado con un certificado de Windows.
+
+PARA PROBAR EN VENTANA
+Abrí una terminal en la carpeta del .exe y corré:  MisionEnergiaTV.exe -- --windowed
+
+PROBLEMAS FRECUENTES
+- Las tablets no encuentran la PC: revisá que la red sea "Privada" y que el juego tenga permiso
+  en el Firewall de Windows (Seguridad de Windows → Firewall → Permitir una aplicación).
+- El QR muestra una IP rara: la PC tiene adaptadores virtuales (VPN, Hyper-V, VirtualBox).
+  Desconectá la VPN, o escribí en la tablet la IP del Wi-Fi o del cable de la PC.
+- Se ve lento: si se puede, conectá la PC al router por cable.

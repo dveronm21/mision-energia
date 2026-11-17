@@ -33,6 +33,16 @@ func _init() -> void:
 	server = RemoteServer.new()
 
 
+## Tele con Windows (el .exe exportado): pantalla completa y sin apagar la pantalla.
+## `-- --windowed` lo deja en ventana; desde el editor o las pruebas no cambia nada.
+static func apply_desktop_window() -> void:
+	if not (OS.has_feature("pc") and OS.has_feature("template")):
+		return
+	DisplayServer.screen_set_keep_on(true)
+	if not OS.get_cmdline_user_args().has("--windowed"):
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+
+
 ## Arranca el servidor. false si no se pudo abrir ningún puerto (el juego sigue, sin tablets).
 func start() -> bool:
 	# Pruebas en la compu: `-- --tv --tv-bind=127.0.0.1 --tv-port=18765`.

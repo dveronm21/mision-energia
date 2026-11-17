@@ -5,6 +5,9 @@ extends RefCounted
 ## Prefijos de interfaces que nunca son la LAN local (datos móviles, VPN, túneles, loopback).
 const EXCLUDED_PREFIXES: Array[String] = ["rmnet", "ccmni", "pdp", "ppp", "tun", "dummy", "clat", "v4-",
 	"ipsec", "ip6tnl", "sit", "gre", "erspan", "ifb", "veth", "lo"]
+## Windows (nombre visible del adaptador): virtuales, VPN y Bluetooth, que las tablets no alcanzan.
+const VIRTUAL_WORDS: Array[String] = ["vethernet", "virtual", "vmware", "vbox", "hyper-v", "wsl",
+	"bluetooth", "vpn", "tap-", "wireguard", "tailscale", "zerotier", "hamachi", "npcap", "pseudo"]
 
 
 ## IP LAN preferida (Wi-Fi/Ethernet, red privada 192.168 > 10 > 172.16–31), o "" si no hay red.
@@ -19,15 +22,18 @@ static func lan_ips() -> Array[String]:
 
 
 ## Ordena las IPv4 de IP.get_local_interfaces() (o equivalente: [{name, addresses}]).
-## Criterio: privadas primero; luego por tipo de interfaz (wlan > eth > hotspot > otras > docker);
-## luego 192.168 > 10 > 172.16–31.
+## Criterio: privadas primero; luego por tipo de interfaz (wlan > eth > hotspot > otras > virtuales);
+## luego las que no terminan en .1 (en una PC, .1 suele ser un adaptador virtual "host-only");
+## luego 192.168 > 10 > 172.16–31. En Windows el nombre es un GUID: se usa `friendly` ("Wi-Fi").
 static func rank_ipv4(interfaces: Array) -> Array[String]:
 	var cands: Array[Array] = []
 	for it: Variant in interfaces:
 		if typeof(it) != TYPE_DICTIONARY:
 			continue
 		var d: Dictionary = it
-		var iname: String = String(d.get("name", "")).to_lower()
+		var iname: String = String(d.get("friendly", "")).to_lower()
+		if iname == "":
+			iname = String(d.get("name", "")).to_lower()
 		if not is_usable_interface(iname):
 			continue
 		for a: Variant in d.get("addresses", []):
@@ -35,21 +41,23 @@ static func rank_ipv4(interfaces: Array) -> Array[String]:
 			if not is_ipv4(ip) or ip.begins_with("127.") or ip.begins_with("169.254.") or ip == "0.0.0.0":
 				continue
 			var rank: int = private_rank(ip)
-			cands.append([1 if rank > 0 else 0, interface_score(iname), rank, ip])
+			cands.append([1 if rank > 0 else 0, interface_score(iname), 0 if ip.ends_with(".1") else 1, rank, ip])
 	cands.sort_custom(func(x: Array, y: Array) -> bool:
-		for k: int in 3:
+		for k: int in 4:
 			if x[k] != y[k]:
 				return x[k] > y[k]
 		return false)
 	var out: Array[String] = []
 	for c: Array in cands:
-		if not out.has(c[3]):
-			out.append(c[3])
+		if not out.has(c[4]):
+			out.append(c[4])
 	return out
 
 
 static func is_usable_interface(iname: String) -> bool:
 	var n: String = iname.to_lower()
+	if n.begins_with("loopback"):
+		return false
 	for p: String in EXCLUDED_PREFIXES:
 		if n.begins_with(p):
 			return false
@@ -59,7 +67,10 @@ static func is_usable_interface(iname: String) -> bool:
 ## Puntaje por nombre de interfaz: Wi-Fi primero, luego Ethernet, hotspot, el resto, contenedores.
 static func interface_score(iname: String) -> int:
 	var n: String = iname.to_lower()
-	if n.begins_with("wlan") or n.begins_with("wl"):
+	for w: String in VIRTUAL_WORDS:
+		if n.contains(w):
+			return 5
+	if n.begins_with("wlan") or n.begins_with("wl") or n.begins_with("wi-fi") or n.begins_with("wifi") 			or n.contains("inalámbrica") or n.contains("wireless"):
 		return 100
 	if n.begins_with("eth") or n.begins_with("en"):
 		return 90
