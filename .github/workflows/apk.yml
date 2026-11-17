@@ -3,7 +3,7 @@ name: Compilar y publicar APK
 # Versión 1.0 (Godot): con cada tag vX.Y.Z se prueban y exportan
 #   MisionEnergia.apk         juego en el celular (mismo paquete que la 0.3: se instala encima)
 #   MisionEnergiaTV.apk       juego en el tele, modo cooperativo con tablets
-#   MisionEnergiaControl.apk  app de las tablets de feria (Java, sin cambios)
+#   MisionEnergiaControl.apk  app de las tablets de feria (Java)
 # y se publican en Releases. El QR (.../releases/latest/download/MisionEnergia.apk) no cambia.
 # Además arma MisionEnergia.aab para Google Play (mismo paquete y firma que el APK del celular,
 # sin compras con dinero real): queda como artefacto de la compilación, no en Releases.

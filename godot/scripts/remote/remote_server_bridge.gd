@@ -25,7 +25,12 @@ func tv_name() -> String:
 
 func poll() -> Array:
 	var s: RemoteServer = _server()
-	return s.poll_events() if s != null else []
+	if s == null:
+		return []
+	# Lee la red justo ahora: el _process del servidor corre después del juego en el cuadro, y sin
+	# esto cada input (y cada ping) esperaba un cuadro entero de más antes de procesarse.
+	s.poll_network()
+	return s.poll_events()
 
 
 func send(conn_id: int, json: String) -> bool:

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Compila y firma una variante de Misión Energía sin Gradle (herramientas Android de Ubuntu).
+# Compila y firma una variante de Misión Energía sin Gradle (herramientas Android de Ubuntu, o el
+# Android SDK en Windows con Git Bash: toma ANDROID_HOME, la plataforma 23 y el build-tools más nuevo).
 #
 #   KS=/ruta/keystore.jks KS_PASS=... ./android/build-variant.sh <phone|tv|control>
 #
@@ -14,8 +15,21 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 VARIANT="${1:-}"
-ANDROID_JAR=/usr/lib/android-sdk/platforms/android-23/android.jar
-BT=/usr/lib/android-sdk/build-tools/debian
+SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/lib/android-sdk}}"
+BS=$(printf '\134'); SDK="${SDK//"$BS"//}"   # Windows: barras invertidas a barras
+ANDROID_JAR="${ANDROID_JAR:-$SDK/platforms/android-23/android.jar}"
+if [ -z "${BT:-}" ]; then
+  if [ -d "$SDK/build-tools/debian" ]; then BT="$SDK/build-tools/debian"
+  else BT="$(ls -d "$SDK"/build-tools/*/ 2>/dev/null | sort -V | tail -1)"; BT="${BT%/}"; fi
+fi
+[ -f "$ANDROID_JAR" ] || { echo "Falta $ANDROID_JAR (sdkmanager \"platforms;android-23\")" >&2; exit 1; }
+# Herramienta del build-tools (o del PATH), con .exe/.bat en Windows.
+tool() {
+  local n
+  for n in "$BT/$1" "$BT/$1.exe" "$BT/$1.bat"; do [ -f "$n" ] && { echo "$n"; return; }; done
+  command -v "$1" || command -v "$1.exe" || command -v "$1.bat" || { echo "Falta $1" >&2; exit 1; }
+}
+AAPT="$(tool aapt)"; ZIPALIGN="$(tool zipalign)"; APKSIGNER="$(tool apksigner)"
 : "${KS:?Falta KS (ruta al keystore)}"
 : "${KS_PASS:?Falta KS_PASS}"
 KS_ALIAS="${KS_ALIAS:-misionenergia}"
@@ -50,18 +64,23 @@ else
 fi
 
 VERSION=$(grep -o 'android:versionName="[^"]*"' "$MANIFEST" | cut -d'"' -f2)
-aapt package -f -m -J "$W/gen" -M "$MANIFEST" -S "$W/res" -I "$ANDROID_JAR"
+"$AAPT" package -f -m -J "$W/gen" -M "$MANIFEST" -S "$W/res" -I "$ANDROID_JAR"
 # shellcheck disable=SC2086
 if ! javac -nowarn -Xlint:-options --release 8 -encoding UTF-8 -classpath "$ANDROID_JAR" -d "$W/classes" \
      $(find $SRC "$W/gen" -name '*.java') 2> "$W/javac.log"; then
   grep -v "^Picked up" "$W/javac.log" >&2; echo "javac falló" >&2; exit 1
 fi
-"$BT/dx" --dex --output="$W/classes.dex" "$W/classes"
-aapt package -f -M "$MANIFEST" -S "$W/res" -A "$W/assets" -I "$ANDROID_JAR" -F "$W/unsigned.apk"
-(cd "$W" && aapt add unsigned.apk classes.dex >/dev/null)
-zipalign -f -p 4 "$W/unsigned.apk" "$W/aligned.apk"
-apksigner sign --ks "$KS" --ks-key-alias "$KS_ALIAS" --ks-pass env:KS_PASS --key-pass env:KS_PASS \
+if [ -f "$BT/dx" ]; then
+  "$BT/dx" --dex --output="$W/classes.dex" "$W/classes"
+else   # build-tools nuevos: d8 en vez de dx
+  # shellcheck disable=SC2046
+  "$(tool d8)" --release --min-api 21 --lib "$ANDROID_JAR" --output "$W" $(find "$W/classes" -name '*.class')
+fi
+"$AAPT" package -f -M "$MANIFEST" -S "$W/res" -A "$W/assets" -I "$ANDROID_JAR" -F "$W/unsigned.apk"
+(cd "$W" && "$AAPT" add unsigned.apk classes.dex >/dev/null)
+"$ZIPALIGN" -f -p 4 "$W/unsigned.apk" "$W/aligned.apk"
+"$APKSIGNER" sign --ks "$KS" --ks-key-alias "$KS_ALIAS" --ks-pass env:KS_PASS --key-pass env:KS_PASS \
   --out "build/$APK" "$W/aligned.apk"
 rm -f "build/$APK.idsig"
-apksigner verify "build/$APK"
+"$APKSIGNER" verify "build/$APK"
 echo "APK listo: android/build/$APK (versión $VERSION)"

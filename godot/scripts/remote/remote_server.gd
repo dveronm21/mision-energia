@@ -84,6 +84,8 @@ func start() -> Error:
 	if _tcp == null:
 		return last_err
 	_running = true
+	# Sin el ahorro de energía del Wi-Fi: si no, los inputs llegan de a tandas cada ~100 ms.
+	AndroidWifiLock.acquire()
 	if discovery_enabled:
 		_discovery = DiscoveryResponder.new(discovery_port, _discovery_reply)
 		var udp_bind: String = "0.0.0.0" if bind_address == "*" else bind_address
@@ -109,6 +111,7 @@ func stop() -> void:
 		_discovery.stop()
 		_discovery = null
 	AndroidMulticastLock.release()
+	AndroidWifiLock.release()
 	_tcp.stop()
 	_tcp = null
 	for ws: WsConnection in _ws.values():

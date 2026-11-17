@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.net.wifi.WifiManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -54,6 +55,7 @@ public class ControlActivity extends Activity {
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final ExecutorService watchdogWorker = Executors.newSingleThreadExecutor();
     private WifiManager.MulticastLock multicastLock;
+    private WifiManager.WifiLock wifiLock;
 
     private volatile TvInfo current;   // tele al que estamos conectados (null = en búsqueda)
     private int watchdogFails;
@@ -186,6 +188,34 @@ public class ControlActivity extends Activity {
     synchronized void releaseMulticastLock() {
         try {
             if (multicastLock != null && multicastLock.isHeld()) multicastLock.release();
+        } catch (RuntimeException ignored) { }
+    }
+
+    /* ------------------------------------------------------------ Wi-Fi de baja latencia */
+
+    /** WIFI_MODE_FULL_LOW_LATENCY (API 29; se compila contra android-23, por eso el número). */
+    private static final int WIFI_MODE_LOW_LATENCY = 4;
+
+    /**
+     * Sin esto, el ahorro de energía del Wi-Fi junta los paquetes y los entrega cada ~100 ms:
+     * en la misma red el control se siente lento (150 ms o más). Solo mientras la app está al frente.
+     */
+    synchronized void acquireWifiLock() {
+        try {
+            if (wifiLock == null) {
+                WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                if (wm == null) return;
+                int mode = Build.VERSION.SDK_INT >= 29 ? WIFI_MODE_LOW_LATENCY : WifiManager.WIFI_MODE_FULL_HIGH_PERF;
+                wifiLock = wm.createWifiLock(mode, "mision-energia-control");
+                wifiLock.setReferenceCounted(false);
+            }
+            if (!wifiLock.isHeld()) wifiLock.acquire();
+        } catch (RuntimeException ignored) { }
+    }
+
+    synchronized void releaseWifiLock() {
+        try {
+            if (wifiLock != null && wifiLock.isHeld()) wifiLock.release();
         } catch (RuntimeException ignored) { }
     }
 
@@ -374,12 +404,14 @@ public class ControlActivity extends Activity {
     protected void onPause() {
         super.onPause();
         stopWatchdog();
+        releaseWifiLock();
         if (web != null) web.onPause();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        acquireWifiLock();
         if (web != null) web.onResume();
         if (current != null) startWatchdog();
         hideSystemUi();
@@ -392,6 +424,7 @@ public class ControlActivity extends Activity {
         worker.shutdownNow();
         watchdogWorker.shutdownNow();
         releaseMulticastLock();
+        releaseWifiLock();
         if (web != null) {
             web.destroy();
             web = null;
