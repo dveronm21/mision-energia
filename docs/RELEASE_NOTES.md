@@ -2,6 +2,10 @@ Misión Energía 1.0: el juego renovado, con modo TV para jugar de a dos.
 
 - Motor nuevo: más fluido en teléfonos y tablets, con efectos, animaciones y sonido renovados.
 - Modo TV cooperativo (MisionEnergiaTV.apk): dos técnicos en la misma planta, cada uno con su tablet. Se conectan escaneando el QR del tele o con la app Misión Energía Control.
+- Versus en pantalla dividida en el modo TV: la pantalla se parte en dos y cada jugador arma su propia planta con su tablet. Gana el primero que la deja funcionando al 100 %.
+- Duelo en red: la misma carrera entre dos teles distintos en la misma Wi-Fi.
+- Menús del tele que se manejan desde la tablet.
+- Modo TV también para una PC con Windows (MisionEnergiaTV-Windows.zip): se conecta a la pantalla y las tablets hacen de control. Instrucciones en el LEEME.txt del zip.
 - Letras y botones que se adaptan a cada pantalla (celular, tablet y tele), con tamaño ajustable en Ajustes.
 - Velocidad del juego ×1, ×2 o ×4 en Ajustes y en la pausa. Con Zonda o nubes, el reloj vuelve a la velocidad normal.
 - Cartel de EPSE sobre la sala de equipos y logos en el piso de la sala.
@@ -12,4 +16,4 @@ Misión Energía 1.0: el juego renovado, con modo TV para jugar de a dos.
 - Soles, mejoras y vestuario como en la 0.3. Tu progreso de la 0.3 no se pasa a la 1.0.
 - Tienda de Soles en **modo demo**: no se cobra dinero real. Control parental antes de cada compra.
 
-Requiere Android 7 o superior. El juego funciona sin internet; el modo TV necesita que el tele y las tablets estén en la misma red Wi-Fi.
+Requiere Android 7 o superior, o Windows 10/11 para la versión de PC. El juego funciona sin internet; el modo TV necesita que el tele (o la PC) y las tablets estén en la misma red Wi-Fi.
