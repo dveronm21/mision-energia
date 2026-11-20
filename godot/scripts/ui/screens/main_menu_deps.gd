@@ -13,3 +13,5 @@ var on_wardrobe: Callable
 var on_settings: Callable
 ## Solo en el tele: duelo contra otra pantalla. Inválido = sin botón.
 var on_duel: Callable = Callable()
+## Solo en el tele: versus en pantalla dividida (dos tablets, o una y el teclado). Inválido = sin botón.
+var on_versus: Callable = Callable()

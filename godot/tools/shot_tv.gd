@@ -8,6 +8,7 @@ extends SceneTree
 
 var _app: App
 var _fails: int = 0
+var _tablets: Array = []
 
 
 class FakeTablet:
@@ -17,6 +18,7 @@ class FakeTablet:
 	var taps: Dictionary = {"action": 0, "inspect": 0, "tool": 0, "pause": 0}
 	var stick: Vector2 = Vector2.ZERO
 	var welcome: Dictionary = {}
+	var sent_at: int = 0
 	var ctx: Dictionary = {}
 	var toasts: int = 0
 	var haptics: int = 0
@@ -48,6 +50,13 @@ class FakeTablet:
 	func send(d: Dictionary) -> void:
 		if ws.get_ready_state() == WebSocketPeer.STATE_OPEN:
 			ws.send_text(JSON.stringify(d))
+			sent_at = Time.get_ticks_msec()
+
+	## Como una tablet de verdad: si no mandó nada en medio segundo, manda su estado (sin eso, el
+	## tele la da por desconectada a los 3 s).
+	func keep_alive() -> void:
+		if not welcome.is_empty() and Time.get_ticks_msec() - sent_at > 500:
+			send_input()
 
 	func hello() -> void:
 		send({"t": "hello", "v": RemoteProtocol.PROTOCOL_VERSION, "name": name, "device": "browser"})
@@ -86,6 +95,8 @@ func _run() -> void:
 	DirAccess.make_dir_recursive_absolute("res://tools/out")
 	_app = (load("res://scenes/Main.tscn") as PackedScene).instantiate() as App
 	root.add_child(_app)
+	# Las esperas de esta prueba cuentan cuadros: a 60 FPS fijos da igual si la pantalla es de 60 o 144 Hz.
+	Engine.max_fps = 60
 	await _frames(5)
 	check(_app.tv != null, "arrancó en modo TV")
 	_app.show_lobby()
@@ -95,6 +106,7 @@ func _run() -> void:
 	var url: String = "ws://127.0.0.1:%d/ws" % port
 	var ana: FakeTablet = FakeTablet.new("Ana")
 	var beto: FakeTablet = FakeTablet.new("Beto")
+	_tablets = [ana, beto]
 	for t: FakeTablet in [ana, beto]:
 		t.open(url)
 	await _pump_until([ana, beto], func() -> bool: return ana.ws.get_ready_state() == WebSocketPeer.STATE_OPEN and beto.ws.get_ready_state() == WebSocketPeer.STATE_OPEN)
@@ -194,20 +206,19 @@ func _run() -> void:
 
 func _frames(n: int) -> void:
 	for i: int in n:
+		_tick(_tablets)
 		await process_frame
 
 
 func _pump(tablets: Array, n: int) -> void:
 	for i: int in n:
-		for t: FakeTablet in tablets:
-			t.pump()
+		_tick(tablets)
 		await process_frame
 
 
 func _pump_until(tablets: Array, cond: Callable, max_frames: int = 600) -> void:
 	for i: int in max_frames:
-		for t: FakeTablet in tablets:
-			t.pump()
+		_tick(tablets)
 		if cond.call():
 			return
 		await process_frame
@@ -224,3 +235,9 @@ func check(ok: bool, what: String) -> void:
 	if not ok:
 		_fails += 1
 	print(("ok    " if ok else "FALLA ") + what)
+
+
+func _tick(tablets: Array) -> void:
+	for t: FakeTablet in tablets:
+		t.pump()
+		t.keep_alive()

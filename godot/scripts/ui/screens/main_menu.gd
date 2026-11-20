@@ -76,10 +76,21 @@ func _init(deps: MainMenuDeps) -> void:
 		if c is Label:
 			(c as Label).add_theme_font_size_override("font_size", 30)
 	actions.add_child(_play)
+	# Versus en la misma pantalla y duelo entre dos pantallas, lado a lado.
+	var modes: HBoxContainer = HBoxContainer.new()
+	modes.add_theme_constant_override("separation", 10)
+	if deps.on_versus.is_valid():
+		var versus: Button = UiCommon.action_button("Versus", deps.on_versus, &"secondary", &"star_fill", true)
+		versus.custom_minimum_size.y = 64
+		versus.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		modes.add_child(versus)
 	if deps.on_duel.is_valid():
-		var duel: Button = UiCommon.action_button("Duelo", deps.on_duel, &"secondary", &"bolt", true)
+		var duel: Button = UiCommon.action_button("Duelo en red", deps.on_duel, &"secondary", &"bolt", true)
 		duel.custom_minimum_size.y = 64
-		actions.add_child(duel)
+		duel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		modes.add_child(duel)
+	if modes.get_child_count() > 0:
+		actions.add_child(modes)
 
 	var tiles: HBoxContainer = HBoxContainer.new()
 	tiles.add_theme_constant_override("separation", 10)

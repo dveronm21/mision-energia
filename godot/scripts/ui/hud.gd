@@ -20,6 +20,11 @@ var _boosters_real: BoosterBar
 var _actions_real: ActionButtons
 var _bottom_lane: VBoxContainer
 var _fit_queued: bool = false
+## Misión compacta siempre (versus en pantalla dividida: media pantalla no da para la lista entera).
+var force_compact: bool = false:
+	set(v):
+		force_compact = v
+		_queue_fit()
 
 ## Debajo de este alto (teléfono con la UI agrandada) la misión se muestra compacta.
 const COMPACT_H: float = 560.0
@@ -153,7 +158,7 @@ func _fit_lanes() -> void:
 	_fit_queued = false
 	if not root.is_inside_tree():
 		return
-	_mission_real.set_compact(root.size.y < COMPACT_H)
+	_mission_real.set_compact(force_compact or root.size.y < COMPACT_H)
 	var w: float = root.size.x
 
 	var left: float = 12.0
@@ -189,10 +194,10 @@ func _place_lane(lane: Control, left: float, right: float) -> float:
 	return w
 
 
+## Rectángulo de `c` en coordenadas del HUD (también con el HUD escalado, como en el versus).
 func _local(c: Control) -> Rect2:
-	var r: Rect2 = c.get_global_rect()
-	r.position -= root.get_global_rect().position
-	return r
+	var xf: Transform2D = root.get_global_transform().affine_inverse() * c.get_global_transform()
+	return xf * Rect2(Vector2.ZERO, c.size)
 
 
 ## Modo TV: se juega desde las tablets, así que el tele no muestra joystick, botonera ni

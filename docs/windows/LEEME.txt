@@ -13,6 +13,13 @@ CÓMO USARLO
    La red de la PC tiene que figurar como "Privada" en Configuración → Red e Internet.
 4. En cada tablet: escaneá el QR de la pantalla o abrí la app Misión Energía Control.
 
+VERSUS EN PANTALLA DIVIDIDA
+En el menú, "Versus": la pantalla se parte en dos y cada jugador arma su propia planta en su
+mitad, con su tablet. Gana el primero que la deja funcionando al 100 %. Si hay una sola tablet,
+la mitad derecha se juega con el teclado de la PC (WASD o flechas para caminar, E o Espacio
+para la acción, R para revisar, M para el multímetro). Esc pausa.
+"Duelo en red" es la carrera entre dos pantallas distintas en la misma Wi-Fi.
+
 Si Windows muestra "Windows protegió su PC" (SmartScreen): tocá "Más información" → "Ejecutar
 de todas formas". Pasa porque el archivo no está firmado con un certificado de Windows.
 

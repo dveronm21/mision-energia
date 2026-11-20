@@ -47,6 +47,10 @@ var duel: DuelMatch = null
 var _duel_screen: DuelScreen = null
 var _duel_banner: DuelBanner = null
 var _duel_sent: Dictionary = {}
+## Versus en pantalla dividida (solo modo TV). null = no hay versus.
+var versus: SplitVersus = null
+var _versus_level: String = ""
+var _versus_pause: SplitPauseScreen = null
 ## Botones de la pantalla del tele replicados en las tablets.
 var _mirror: MenuMirror = MenuMirror.new()
 
@@ -115,12 +119,17 @@ func _process(delta: float) -> void:
 		_update_duel(dt)
 	var ss: GameSession = session
 	var menu_open: bool = ui.screens.top() != null
-	if tv != null and (ss == null or menu_open):
+	if tv != null and ((ss == null and versus == null) or menu_open):
 		tv.navigate_menus(dt)
 		_push_menu_context()
 		for slot: int in RemoteHost.SLOTS:
 			for p: Dictionary in tv.host.take_picks(slot):
 				_mirror.pick(int(p["v"]), int(p["i"]))
+		if ui.screens.top() is SplitSetupScreen:
+			(ui.screens.top() as SplitSetupScreen).set_players_text(SplitSetupScreen.players_text(_versus_players()))
+	if versus != null:
+		_update_versus(dt, menu_open)
+		return
 	if ss == null:
 		return
 	var local: Vector2 = (hud.joystick.vector() + _keyboard.vector()).clamp(-Vector2.ONE, Vector2.ONE)
@@ -195,6 +204,7 @@ func show_lobby() -> void:
 
 
 func show_menu() -> void:
+	_end_versus()
 	_end_session()
 	_menu_stale = false
 	var s: AppServices = _s()
@@ -208,6 +218,7 @@ func show_menu() -> void:
 	d.on_settings = push_settings
 	if tv != null:
 		d.on_duel = start_duel
+		d.on_versus = show_versus_setup
 	ui.screens.reset(MainMenu.new(d))
 	if not _welcome_checked:
 		_welcome_checked = true
@@ -435,6 +446,9 @@ func _on_finished(result: LevelResult) -> void:
 
 
 func pause() -> void:
+	if versus != null:
+		_pause_versus()
+		return
 	var ss: GameSession = session
 	if ss == null or ss.paused or ss.phase() == SessionPort.PHASE_FINISHED:
 		return
@@ -599,11 +613,151 @@ func _end_duel_play() -> void:
 	_end_session()
 
 
+# ================================================================== versus
+
+
+## Menú → Versus: elegir el nivel. Hace falta al menos una tablet (la otra mitad, con el teclado).
+func show_versus_setup() -> void:
+	_end_versus()
+	if _versus_players().size() < 2:
+		ui.show_toast("Para el versus conectá dos tablets (o una, y la otra mitad se juega con el teclado).", UiRootPort.KIND_BAD, 4200)
+		return
+	ui.screens.push(SplitSetupScreen.new(_s().levels.all(), start_versus, _pop))
+
+
+## Quién juega en cada mitad: las tablets por asiento; si hay una sola, la derecha es del teclado.
+func _versus_players() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if tv == null:
+		return out
+	for p: RemotePlayer in tv.players():
+		if out.size() < 2:
+			out.append({"slot": p.slot, "name": p.name, "color": Color.from_string(p.color, UiTheme.SUN)})
+	if out.size() == 1:
+		out.append({"slot": -1, "name": "Teclado", "color": UiTheme.SUN})
+	return out
+
+
+func start_versus(level_id: String) -> void:
+	var players: Array[Dictionary] = _versus_players()
+	if players.size() < 2:
+		ui.show_toast("Se desconectó una tablet: conectala y elegí el nivel de nuevo.", UiRootPort.KIND_BAD, 4000)
+		return
+	_end_versus()
+	_end_session()
+	_versus_level = level_id
+	var s: AppServices = _s()
+	versus = SplitVersus.new(s.levels.get_level(level_id), players, {
+		"audio": _audio(), "inventory": s.inventory, "boosters": s.boosters,
+		"on_feedback": _on_session_feedback,
+	})
+	hud.root.visible = false
+	ui.hud_layer.add_child(versus.root)
+	ui.screens.reset()
+	ui.set_hud_visible(true)
+	versus.start(QUALITY_INDEX[_quality])
+	_audio().play("whoosh")
+
+
+func _update_versus(dt: float, menu_open: bool) -> void:
+	var local: Vector2 = (hud.joystick.vector() + _keyboard.vector()).clamp(-Vector2.ONE, Vector2.ONE)
+	var moves: Array[Vector2] = []
+	for side: SplitSide in versus.sides():
+		if side.slot < 0:
+			moves.append(local if not menu_open else Vector2.ZERO)
+		else:
+			var it: PlayerIntent = tv.intent(side.slot)
+			moves.append(Vector2(it.x, it.y) if not menu_open else Vector2.ZERO)
+	var v: SplitVersus = versus
+	for e: StringName in v.update(dt, moves):
+		if e == &"go":
+			_audio().play("whoosh")
+		elif e == &"finished":
+			# Un momento para ver el festejo antes del cartel.
+			get_tree().create_timer(1.8).timeout.connect(func() -> void:
+				if versus == v:
+					_show_versus_result())
+	if menu_open or versus != v:
+		return
+	for side: SplitSide in v.sides():
+		if side.slot < 0:
+			continue
+		var it: PlayerIntent = tv.intent(side.slot)
+		if it.pause:
+			_pause_versus()
+			return
+		var t: Technician = side.session.technician_for_slot(side.slot)
+		if t == null:
+			continue
+		if v.phase == SplitVersus.Phase.PLAYING and (it.action or it.inspect or it.tool):
+			side.session.apply_intent(t, it)
+		var ctx: Dictionary = side.session.controller_context(t)
+		if v.phase == SplitVersus.Phase.COUNTDOWN:
+			# En la cuenta regresiva la partida está quieta, pero la tablet ya muestra los controles.
+			ctx["screen"] = "playing"
+			ctx["objective"] = v.countdown_text()
+		tv.host.set_context(side.slot, ctx)
+
+
+func _pause_versus() -> void:
+	if versus == null or versus.phase == SplitVersus.Phase.FINISHED or _versus_pause != null:
+		return
+	versus.set_paused(true)
+	hud.joystick.reset()
+	_versus_pause = SplitPauseScreen.new(_resume_versus, leave_versus)
+	ui.screens.push(_versus_pause)
+
+
+func _resume_versus() -> void:
+	if _versus_pause != null:
+		ui.screens.remove(_versus_pause)
+		_versus_pause = null
+	if versus != null:
+		versus.set_paused(false)
+
+
+func _show_versus_result() -> void:
+	_versus_pause = null
+	ui.screens.reset(SplitResultScreen.new(versus,
+		func() -> void: start_versus(_versus_level),
+		func() -> void:
+			show_menu()
+			show_versus_setup(),
+		leave_versus, _audio()))
+
+
+func leave_versus() -> void:
+	show_menu()
+
+
+## Cierra las dos partidas del versus y devuelve el HUD normal.
+func _end_versus() -> void:
+	_versus_pause = null
+	if versus == null:
+		return
+	versus.dispose()
+	versus = null
+	hud.root.visible = true
+	ui.set_hud_visible(false)
+
+
+## Partida que manejan el teclado y la pantalla táctil: la normal, o en el versus la mitad sin tablet.
+func _local_session() -> GameSession:
+	if versus != null:
+		return versus.keyboard_session() if versus.phase == SplitVersus.Phase.PLAYING and not versus.paused else null
+	return session
+
+
 # ================================================================== modo TV
 
 
 ## Una tablet entró (o volvió) en plena partida: su técnico aparece al lado del otro.
 func _on_tv_join(p: RemotePlayer) -> void:
+	if versus != null:
+		var side: SplitSide = versus.side_for_slot(p.slot)
+		if side != null:
+			side.session.add_technician(p.slot, p.name, side.color)
+		return
 	if session != null:
 		session.add_technician(p.slot, p.name, Color.from_string(p.color, UiTheme.SUN))
 
@@ -631,6 +785,12 @@ func _push_menu_context() -> void:
 		tv.menu_context("result", DuelResultScreen.tablet_text(duel), menu)
 	elif top is ResultScreen:
 		tv.menu_context("result", "¡Mirá el resultado en el tele!", menu)
+	elif top is SplitPauseScreen:
+		tv.menu_context("paused", "Versus en pausa: elegí qué hacer", menu)
+	elif top is SplitResultScreen and versus != null:
+		tv.menu_context("result", SplitResultScreen.title_text(versus), menu)
+	elif top is SplitSetupScreen:
+		tv.menu_context("menu", "Versus: elegí el nivel en el tele", menu)
 	elif top is DuelScreen and duel != null:
 		tv.menu_context("menu", DuelScreen.tablet_text(duel), menu)
 	else:
@@ -642,33 +802,39 @@ func _on_sfx(sfx_name: String) -> void:
 
 
 func _on_action() -> void:
-	if session != null:
-		session.do_action()
+	var ss: GameSession = _local_session()
+	if ss != null:
+		ss.do_action()
 
 
 func _on_inspect() -> void:
-	if session != null:
-		session.toggle_inspect()
+	var ss: GameSession = _local_session()
+	if ss != null:
+		ss.toggle_inspect()
 
 
 func _on_meter() -> void:
-	if session != null:
-		session.toggle_meter()
+	var ss: GameSession = _local_session()
+	if ss != null:
+		ss.toggle_meter()
 
 
 func _on_use_booster(id: String) -> void:
-	if session != null:
-		session.use_booster(id)
+	var ss: GameSession = _local_session()
+	if ss != null:
+		ss.use_booster(id)
 
 
 func _on_toggle_load(label: String, on: bool) -> void:
-	if session != null:
-		session.toggle_load(label, on)
+	var ss: GameSession = _local_session()
+	if ss != null:
+		ss.toggle_load(label, on)
 
 
 func _on_inspect_close() -> void:
-	if session != null:
-		session.close_inspect()
+	var ss: GameSession = _local_session()
+	if ss != null:
+		ss.close_inspect()
 
 
 ## Botón atrás de Android (o Escape). false = no había nada que cerrar (la app puede salir).
@@ -677,6 +843,9 @@ func handle_back() -> bool:
 		show_lobby()
 		return true
 	if ui.handle_back():
+		return true
+	if versus != null:
+		_pause_versus()
 		return true
 	if session != null and session.phase() != SessionPort.PHASE_FINISHED:
 		pause()
